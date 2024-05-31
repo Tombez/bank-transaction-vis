@@ -12,15 +12,43 @@ import {addRules} from "./rules.js";
 document.addEventListener("DOMContentLoaded", event => {
     let transactionInput = document.querySelector("#transaction-input");
     transactionInput.addEventListener("change", transactionInputChange);
+
+    fetch("./example-graph.json").then(res => {
+        res.json().then(encoded => {
+            const root = decodeGraph(encoded);
+            makeGraph(root);
+        });
+    });
 });
 
 const transactionInputChange = event => {
     const file = event.target.files[0];
     let reader = new FileReader();
     reader.onload = event => {
-        processFile(event.target.result);
+        const root = processFile(event.target.result);
+        makeGraph(root);
     };
     reader.readAsBinaryString(file);
+};
+
+const encodeGraph = root => {
+    let copy = [
+        root.name,
+        +(root.total.toFixed(2)),
+        root.numTransactions
+    ];
+    if (root.children) copy.push(root.children.map(encodeGraph));
+    return copy;
+};
+const decodeGraph = array => {
+    let sector = {
+        name: array.shift(),
+        total: array.shift(),
+        numTransactions: array.shift(),
+        children: array.shift()
+    };
+    if (sector.children) sector.children = sector.children.map(decodeGraph);
+    return sector;
 };
 
 const hsl = (h, s=1, l=0.5) => ({
@@ -86,6 +114,7 @@ const processFile = textContent => {
         if (!curCategory.transactions) curCategory.transactions = [];
         curCategory.transactions.push(transaction);
     }
+    let labeledCSV = transactions.map(row => row.join(",")).join("\n");
 
     const ignored = categories.get("Ignored");
     categories.delete("Ignored");
@@ -116,10 +145,16 @@ const processFile = textContent => {
                 childrenTotal
             });
         });
-    }
+    };
     let root = consolidate(new Map([["root", categories]]))[0];
+    console.log(JSON.stringify(encodeGraph(root)));
     console.log("total:", root.total);
     console.log("root:", root);
+    console.log("no matching transactions:", classifiers.filter(c => !c.transactions));
+    return root;
+};
+
+const makeGraph = root => {
     const outerRadius = 400;
     const innerRadius = 50;
     let canvas = document.querySelector("#canvas");
@@ -372,11 +407,7 @@ const processFile = textContent => {
             dragging[5] = mouse.y;
         }
     });
-
-    let labeledCSV = transactions.map(row => row.join(",")).join("\n");
-
-    console.log("no matching transactions:", classifiers.filter(c => !c.transactions));
-};
+}
 
 const labelTransaction = (date, desc, amount) => {
     for (const classifier of classifiers) {

@@ -4,8 +4,8 @@ export default class HierarchyGraph {
     constructor(root, title, canvasSize) {
         this.root = root;
         this.title = title;
-        this.outerRadius = 400;
-        this.innerRadius = 50;
+        this.outerRadius = 350;
+        this.innerRadius = 40;
         this.canvas = document.createElement("canvas");
         this.ctx = this.canvas.getContext("2d");
         this.texts = [];
@@ -166,7 +166,7 @@ export default class HierarchyGraph {
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
         for (let [text, ox, oy, ang, dx, dy] of this.texts) {
-            this.ctx.font = "bold 22px Arial";
+            this.ctx.font = "bold 20px Arial";
 
             this.ctx.beginPath();
             this.ctx.lineWidth = 2.5;

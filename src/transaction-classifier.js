@@ -1,12 +1,11 @@
 import {addRules} from "./rules.js";
 import HierarchalPieGraph from "./HierarchalPieGraph.js";
 
-const canvasSize = {x: 800, y: 800};
+const canvasSize = {x: 600, y: 600};
 const graphs = [];
 let textInp = document.querySelector("#transaction-input");
 let unlabeledDiv = document.querySelector("#unlabled");
 let classifiers = [];
-let categories = new Map();
 
 const loop = () => {
     for (const graph of graphs) {
@@ -32,8 +31,57 @@ const transactionInputChange = event => {
     const file = event.target.files[0];
     let reader = new FileReader();
     reader.onload = event => {
-        const root = processFile(event.target.result);
+        const textContent = event.target.result;
+        const csv = textContent.trim();
+        let transactions = csv.split("\n").map(line=>line.split(","));
+        let headers = transactions.shift();
+        let fieldIndices = {};
+        for (let i = 0; i < headers.length; ++i) {
+            let header = headers[i];
+            fieldIndices[header] = i;
+        }
+        const dateField = fieldIndices["Transaction Date"];
+        const descField = fieldIndices["Description"];
+        const amountField = fieldIndices["Amount"];
+        transactions = transactions.map(t => ({
+            date: t[dateField],
+            desc: t[descField],
+            amount: t[amountField]
+        }));
+        const {root, income} = labelTransactions(transactions);
+
         makeGraph(root, "All Transactions");
+        makeGraph(income, "Income");
+
+        for (const t of transactions) {
+            let [m,d,y] = t.date.split("/");
+            t.timestamp = +new Date(y,m-1,d);
+            t.year = +y;
+            t.quarter = (m - 1) / 3 | 0;
+        }
+        const minDateT = transactions.reduce((cur,min) =>
+            cur.timestamp < min.timestamp ? cur : min);
+        let {year, quarter} = minDateT;
+        const filterQuarter = () =>
+            transactions.filter(t => t.year == year && t.quarter == quarter);
+        let curQuarter = filterQuarter();
+        while (curQuarter.length) {
+            const {root} = labelTransactions(curQuarter);
+            makeGraph(root, `${year} Q${quarter + 1}`);
+            year += quarter == 3;
+            quarter = (quarter + 1) % 4;
+            curQuarter = filterQuarter();
+        }
+
+        year = minDateT.year;
+        const filterYear = () =>
+            transactions.filter(t => t.year == year);
+        for (let curYear = filterYear(); curYear.length;) {
+            const {root} = labelTransactions(curYear);
+            makeGraph(root, `${year}`);
+            year++;
+            curYear = filterYear();
+        }
     };
     reader.readAsBinaryString(file);
 };
@@ -58,35 +106,20 @@ const decodeGraph = array => {
     return sector;
 };
 
-const processFile = textContent => {
-    const csv = textContent.trim();
-    let transactions = csv.split("\n").map(line=>line.split(","));
-    let headers = transactions[0];
-    let fieldIndices = {};
-    for (let i = 0; i < headers.length; ++i) {
-        let header = headers[i];
-        fieldIndices[header] = i;
-    }
-    let dateField = fieldIndices["Transaction Date"];
-    let descField = fieldIndices["Description"];
-    let amountField = fieldIndices["Amount"];
-    let categoryField = fieldIndices["Category"];
-    let subCatField = fieldIndices["Sub Category"];
-    let terCatField = fieldIndices["Tertiary Category"];
+const labelTransactions = transactions => {
+    let categories = new Map();
 
     classifiers.sort((a,b) => b.unique.length - a.unique.length);
 
-    for (let i = 1; i < transactions.length; i++) {
-        const transaction = transactions[i];
-        const date = transaction[dateField];
-        const description = transaction[descField];
-        const amount = transaction[amountField];
+    for (const transaction of transactions) {
+        const {date, desc, amount} = transaction;
 
-        const [label, classifier] = labelTransaction(date, description, amount);
+        const [label, classifier] = labelTransaction(date, desc, amount);
         if (!classifier.transactions) classifier.transactions = [];
         classifier.transactions.push(transaction);
         transaction.classifier = classifier;
         const labels = label.split("/");
+        transaction.labels = labels;
         const category = labels[0];
 
         if (!category) {
@@ -95,14 +128,8 @@ const processFile = textContent => {
             unlabeledDiv.appendChild(elm);
         }
 
-        transaction[categoryField] = category;
-        transaction[subCatField] = labels[1] || "";
-        transaction[terCatField] = labels[2] || "";
-
         let curCategory = categories;
-        for (let i = 0; i < labels.length; ++i) {
-            const label = labels[i];
-
+        for (const label of labels) {
             if (!curCategory.has(label))
                 curCategory.set(label, new Map());
             curCategory = curCategory.get(label);
@@ -110,7 +137,7 @@ const processFile = textContent => {
         if (!curCategory.transactions) curCategory.transactions = [];
         curCategory.transactions.push(transaction);
     }
-    let labeledCSV = transactions.map(row => row.join(",")).join("\n");
+    // let labeledCSV = transactions.map(row => row.join(",")).join("\n");
 
     const ignored = categories.get("Ignored");
     categories.delete("Ignored");
@@ -125,10 +152,10 @@ const processFile = textContent => {
             if (!children.length) children = null;
             const transactions = val.transactions;
             const transactionsTotal =
-                (transactions || []).reduce((sum,c)=>sum+(-c[amountField]),0);
+                (transactions || []).reduce((sum,c)=>sum+(-c.amount),0);
             const childrenTotal =
                 (children || []).reduce((sum, c) => sum + c.total, 0);
-            const total = transactionsTotal + childrenTotal;
+            const total = Math.abs(transactionsTotal + childrenTotal);
             const numTransactions = (transactions ? transactions.length : 0) +
                 (children || []).reduce((sum, c) => sum + c.numTransactions, 0);
             return ({
@@ -143,11 +170,12 @@ const processFile = textContent => {
         });
     };
     let root = consolidate(new Map([["root", categories]]))[0];
+    let incomeRoot = consolidate(new Map([["income", income]]))[0];
     console.log(JSON.stringify(encodeGraph(root)));
     console.log("total:", root.total);
     console.log("root:", root);
     console.log("no matching transactions:", classifiers.filter(c => !c.transactions));
-    return root;
+    return {root, income: incomeRoot};
 };
 
 const makeGraph = (root, title) => {

@@ -1,2 +1,3 @@
 *.csv
 rules.js
+transaction-description-cleaner.js

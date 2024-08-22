@@ -18,7 +18,7 @@ export default class HierarchyGraph {
         this.canvas.width = canvasSize.x;
         this.canvas.height = canvasSize.y;
         this.attachListeners();
-        this.calculatePieces(root.children, root.total, -0.5*Math.PI, 1.5*Math.PI, this.innerRadius, radius);
+        this.calculatePieces(root.children, root.total, 0, 2*Math.PI, this.innerRadius, radius);
     }
     attachListeners() {
         this.canvas.addEventListener("mousedown", event => {
@@ -92,7 +92,7 @@ export default class HierarchyGraph {
     }
     checkHover(pieces) {
         let mAngle = Math.atan2(this.mouse.y, this.mouse.x);
-        if (mAngle < -0.5*Math.PI) mAngle += 2*Math.PI;
+        if (mAngle < 0) mAngle += 2*Math.PI;
         const mRadius = Math.hypot(this.mouse.x, this.mouse.y);
         let hoverSector = this.whichSector(mAngle, mRadius, this.root.children);
         if (!hoverSector) {

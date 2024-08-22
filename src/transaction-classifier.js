@@ -1,5 +1,11 @@
 import {addRules} from "./rules.js";
 import HierarchalPieGraph from "./HierarchalPieGraph.js";
+import FlowGraph from "./FlowGraph.js";
+
+const dateToMDY = (n, sep = "/") => {
+    const d = new Date(n);
+    return d.getMonth() + 1 + sep + d.getDate() + sep + d.getFullYear();
+};
 
 const canvasSize = {x: 600, y: 600};
 const graphs = [];
@@ -22,7 +28,7 @@ document.addEventListener("DOMContentLoaded", event => {
     fetch("./example-graph.json").then(res => {
         res.json().then(encoded => {
             const root = decodeGraph(encoded);
-            makeGraph(root, "Example");
+            makeHPieGraph(root, "Example");
         });
     });
 });
@@ -33,8 +39,11 @@ const transactionInputChange = event => {
     reader.onload = event => {
         const textContent = event.target.result;
         const csv = textContent.trim();
-        let transactions = csv.split("\n").map(line=>line.split(","));
-        let headers = transactions.shift();
+        let transactions = csv.split("\n").map(line => ({
+            cols: line.split(","),
+            source: line
+        }));
+        let headers = transactions.shift().cols;
         let fieldIndices = {};
         for (let i = 0; i < headers.length; ++i) {
             let header = headers[i];
@@ -43,31 +52,57 @@ const transactionInputChange = event => {
         const dateField = fieldIndices["Transaction Date"];
         const descField = fieldIndices["Description"];
         const amountField = fieldIndices["Amount"];
-        transactions = transactions.map(t => ({
-            date: t[dateField],
-            desc: t[descField],
-            amount: t[amountField]
-        }));
-        const {root, income} = labelTransactions(transactions);
+        transactions.forEach(t => {
+            t.date = t.cols[dateField],
+            t.desc = t.cols[descField],
+            t.amount = t.cols[amountField]
+        });
 
-        makeGraph(root, "All Transactions");
-        makeGraph(income, "Income");
+        // const {root, income} = labelTransactions(transactions);
+        // makeFlowGraph({root, income}, "All Transactions");
 
         for (const t of transactions) {
             let [m,d,y] = t.date.split("/");
+            if (!/\d\d?\/\d\d?\/\d{4}/.test(t.date))
+                console.error("invalid date: ", t.date);
             t.timestamp = +new Date(y,m-1,d);
             t.year = +y;
             t.quarter = (m - 1) / 3 | 0;
+            t.month = +m;
+            t.day = +d;
         }
+        const filterCustom = (start, end) =>
+            transactions.filter(t => t.timestamp >= start && t.timestamp < end);
+
+
         const minDateT = transactions.reduce((cur,min) =>
             cur.timestamp < min.timestamp ? cur : min);
+        const maxDateT = transactions.reduce((cur,max) =>
+            cur.timestamp > max.timestamp ? cur : max);
+
+        // let animDate = minDateT.timestamp;
+        // const animate = () => {
+        //     for (const graph of graphs) document.body.removeChild(graph.canvas);
+        //     while (graphs.pop());
+        //     const endDate = animDate + 1000 * 60 * 60 * 24 * 365.25;
+        //     let curTrans = filterCustom(animDate, endDate);
+        //     animDate += 1000 * 60 * 60 * 24;
+        //     const {root, income} = labelTransactions(curTrans);
+        //     makeFlowGraph({root, income}, `${dateToMDY(animDate)} to ${dateToMDY(endDate)}`);
+        //     //setTimeout(animate, 50);
+        // };
+        // animate();
+
+
+        
         let {year, quarter} = minDateT;
+        console.log("minDate:", minDateT, "year " + year, "quarter " + quarter)
         const filterQuarter = () =>
             transactions.filter(t => t.year == year && t.quarter == quarter);
         let curQuarter = filterQuarter();
         while (curQuarter.length) {
-            const {root} = labelTransactions(curQuarter);
-            makeGraph(root, `${year} Q${quarter + 1}`);
+            const {root, income} = labelTransactions(curQuarter);
+            makeFlowGraph({root, income}, `${year} Q${quarter + 1}`);
             year += quarter == 3;
             quarter = (quarter + 1) % 4;
             curQuarter = filterQuarter();
@@ -77,8 +112,8 @@ const transactionInputChange = event => {
         const filterYear = () =>
             transactions.filter(t => t.year == year);
         for (let curYear = filterYear(); curYear.length;) {
-            const {root} = labelTransactions(curYear);
-            makeGraph(root, `${year}`);
+            const {root, income} = labelTransactions(curYear);
+            makeFlowGraph({root, income}, `${year}`);
             year++;
             curYear = filterYear();
         }
@@ -124,7 +159,7 @@ const labelTransactions = transactions => {
 
         if (!category) {
             let elm = document.createElement("pre");
-            elm.textContent = transaction.join(",");
+            elm.textContent = transaction.source;
             unlabeledDiv.appendChild(elm);
         }
 
@@ -141,12 +176,13 @@ const labelTransactions = transactions => {
 
     const ignored = categories.get("Ignored");
     categories.delete("Ignored");
-    console.log("ignored:", ignored);
+    // console.log("ignored:", ignored);
     const income = categories.get("Income");
     categories.delete("Income");
     console.log("income:", income);
 
     const consolidate = (map) => { // recursive
+        if (!map) return [];
         return Array.from(map.entries()).map(([name, val]) => {
             let children = consolidate(val);
             if (!children.length) children = null;
@@ -170,19 +206,81 @@ const labelTransactions = transactions => {
         });
     };
     let root = consolidate(new Map([["root", categories]]))[0];
-    let incomeRoot = consolidate(new Map([["income", income]]))[0];
-    console.log(JSON.stringify(encodeGraph(root)));
-    console.log("total:", root.total);
-    console.log("root:", root);
+    let incomeRoot = consolidate(new Map([["Income", income]]))[0];
+    // console.log(JSON.stringify(encodeGraph(root)));
+    // console.log("total:", root.total);
     console.log("no matching transactions:", classifiers.filter(c => !c.transactions));
     return {root, income: incomeRoot};
 };
 
-const makeGraph = (root, title) => {
+const makeHPieGraph = (root, title) => {
     let graph = new HierarchalPieGraph(root, title, canvasSize);
+    graphs.push(graph);
+    console.log(title + " root:", graph.root);
+    document.body.appendChild(graph.canvas);
+    return graph;
+};
+const makeFlowGraph = ({root, income}, title) => {
+    let layers = [];
+    fillLayers(income, layers);
+    for (const col of layers)
+        for (const piece of col) {
+            [piece.left, piece.right] = [piece.right, piece.left];
+            piece.color = "#285";
+        }
+    layers.reverse();
+    const incomeLayersLen = layers.length;
+
+    
+    income.right = [{vOffset: 0, piece: root}];
+    root.left = [{vOffset: 0, piece: income}];
+    root.name = "Spending";
+    root.color = "#900";
+    fillLayers(root, layers, layers.length);
+    console.log(layers);
+
+    const deficit = income.total - root.total;
+    if (deficit > 0) {
+        let savings = {
+            name: "Savings",
+            total: deficit,
+            left: [{vOffset: 0, piece: income}],
+            color: "#090"
+        };
+        income.right.push({vOffset: 1 - deficit / income.total, piece: savings});
+        layers[incomeLayersLen].push(savings);
+    } else if (deficit < 0) {
+        let savings = {
+            name: "From Savings",
+            total: -deficit,
+            right: [{vOffset: 0, piece: root}],
+            color: "#900"
+        };
+        root.left.push({vOffset: 1 - -deficit / root.total, piece: savings});
+        layers[incomeLayersLen - 1].push(savings);
+    }
+    
+    let graph = new FlowGraph(layers, title, {x: 1000, y: 600});
     graphs.push(graph);
     document.body.appendChild(graph.canvas);
     return graph;
+};
+const fillLayers = (root, layers, index = 0) => { // recursive
+    if (!layers[index]) layers[index] = [];
+    layers[index++].push(root);
+    if (root.children) {
+        root.children.sort((a, b) => b.total - a.total);
+        for (const child of root.children) {
+            fillLayers(child, layers, index);
+            let vOffset = 0;
+            root.right = root.children.map(c => {
+                let wrapper = {vOffset, piece: c};
+                vOffset += c.total / root.total;
+                return wrapper;
+            });
+            child.left = [{vOffset: 0, piece: root}];
+        }
+    }
 };
 
 const labelTransaction = (date, desc, amount) => {

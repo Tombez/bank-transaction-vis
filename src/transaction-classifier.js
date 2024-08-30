@@ -1,4 +1,8 @@
-import {addRules} from "./rules.js";
+import("./rules.js").then(mod => {
+    mod.addRules(addClassifier);
+}).catch(err => {
+    console.log(err);
+});
 import HierarchalPieGraph from "./HierarchalPieGraph.js";
 import FlowGraph from "./FlowGraph.js";
 
@@ -20,18 +24,6 @@ const loop = () => {
     requestAnimationFrame(loop);
 };
 loop();
-
-document.addEventListener("DOMContentLoaded", event => {
-    let transactionInput = document.querySelector("#transaction-input");
-    transactionInput.addEventListener("change", transactionInputChange);
-
-    fetch("./example-graph.json").then(res => {
-        res.json().then(encoded => {
-            const root = decodeGraph(encoded);
-            makeHPieGraph(root, "Example");
-        });
-    });
-});
 
 const transactionInputChange = event => {
     const file = event.target.files[0];
@@ -312,4 +304,18 @@ const switchClassifier = (type, unique, label) => {
             throw new TypeError(`Unknown type "${type}"`);
     }
 };
-addRules(addClassifier);
+
+const makeExample = event => {
+    let transactionInput = document.querySelector("#transaction-input");
+    transactionInput.addEventListener("change", transactionInputChange);
+
+    fetch("./example-graph.json").then(res => {
+        res.json().then(encoded => {
+            const root = decodeGraph(encoded);
+            makeHPieGraph(root, "Example");
+        });
+    });
+};
+
+if (document.readyState !== "loading") makeExample();
+else document.addEventListener("DOMContentLoaded", makeExample);

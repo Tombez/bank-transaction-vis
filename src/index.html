@@ -1,5 +1,8 @@
 <head>
     <style>
+        body {
+            background-color: #333;
+        }
         textarea {
             width: 80%;
             height:80%;
@@ -8,11 +11,20 @@
         canvas {
             margin: 4px;
         }
+        #unlabeled {
+            display: none;
+            border: 2px solid black;
+            max-height: 80%;
+            overflow: scroll;
+        }
     </style>
     <script src="./transaction-classifier.js" type="module"></script>
 </head>
 <body>
     <input id="transaction-input" type="file" accept=".csv,.txt">
     <button id="submit">Enter</button>
-    <div id="unlabled"></div>
+    <div id="unlabeled">
+        <h2>Unlabeled Transactions</h2>
+    </div>
+    <br>
 </body>

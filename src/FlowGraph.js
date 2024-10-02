@@ -11,7 +11,31 @@ export default class FlowGraph {
         this.barWidth = 20;
         this.horizontalPad = 100;
 
+        this.mouse = {x: 0, y: 0};
+        this.attachListeners();
+
         this.calculatePieces(layers);
+    }
+    attachListeners() {
+        this.canvas.addEventListener("mousedown", event => {
+            const x = this.mouse.x = event.offsetX;
+            const y = this.mouse.y = event.offsetY;
+
+            console.log(this.closestPiece.transactions.map(t=>t.source).join("\n"));
+        });
+        this.canvas.addEventListener("mouseup", event => {
+            
+        });
+        this.canvas.addEventListener("mousemove", event => {
+            this.mouse.x = event.offsetX;
+            this.mouse.y = event.offsetY;
+        });
+        this.canvas.addEventListener("mouseenter", event => {
+            this.focused = true;
+        });
+        this.canvas.addEventListener("mouseout", event => {
+            this.focused = false;
+        });
     }
     calculatePieces(layers) {
         this.horizontalGap = (
@@ -27,6 +51,7 @@ export default class FlowGraph {
 
             layer.total = layer.reduce((sum, p) => p.total + sum, 0);
             layer.possiblePixelsPer$ = (this.canvas.height - (layer.length + 1) * this.verticalPad) / layer.total;
+            if (layer.possiblePixelsPer$ < 0) debugger;
         }
         this.rootLayer = layers.reduce((least, cur) =>
             cur.possiblePixelsPer$ < least.possiblePixelsPer$ ? cur : least);
@@ -46,7 +71,25 @@ export default class FlowGraph {
             }
         }
     }
+    checkHover() {
+        this.closestPiece = null;
+        if (!this.focused) return;
+        let leastDistSq = Infinity;
+        for (const col of this.layers) {
+            for (const piece of col) {
+                let px = col.x + this.barWidth / 2;
+                let py = piece.y + piece.height / 2;
+
+                const distSq = (px - this.mouse.x)**2 + (py - this.mouse.y)**2;
+                if (distSq < leastDistSq) {
+                    leastDistSq = distSq;
+                    this.closestPiece = piece;
+                }
+            }
+        }
+    }
     update() {
+        this.checkHover();
         this.draw();
     }
     draw() {
@@ -98,12 +141,13 @@ export default class FlowGraph {
 
         ctx.fillStyle = "#fff";
         ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
         
-        ctx.font = "bold 12px Arial";
         for (const col of this.layers) {
             for (const piece of col) {
                 // if (piece.height < 2) continue;
-                ctx.textBaseline = "middle";
+                const fontSize = piece == this.closestPiece ? 16 : 12;
+                ctx.font = `bold ${fontSize}px Arial`;
                 ctx.fillText(piece.name + " $" + Math.round(piece.total).toLocaleString(), col.x + this.barWidth / 2, piece.y + piece.height / 2 - 1);
             }
         }

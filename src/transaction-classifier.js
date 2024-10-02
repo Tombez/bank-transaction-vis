@@ -14,7 +14,7 @@ const dateToMDY = (n, sep = "/") => {
 const canvasSize = {x: 600, y: 600};
 const graphs = [];
 let textInp = document.querySelector("#transaction-input");
-let unlabeledDiv = document.querySelector("#unlabled");
+let unlabeledDiv = document.querySelector("#unlabeled");
 let classifiers = [];
 
 const loop = () => {
@@ -50,8 +50,20 @@ const transactionInputChange = event => {
             t.amount = t.cols[amountField]
         });
 
-        // const {root, income} = labelTransactions(transactions);
-        // makeFlowGraph({root, income}, "All Transactions");
+        // All time Flow:
+        const {root, income, ignored} = labelTransactions(transactions);
+        makeFlowGraph({root, income}, "All Time");
+
+        // All time ignored:
+        let layers = [];
+        fillLayers(ignored, layers);
+        let graph = new FlowGraph(layers, "All Time Ignored", {x: 1000, y: 600});
+        graphs.push(graph);
+        document.body.appendChild(graph.canvas);
+
+        // All time HPie:
+        makeHPieGraph(root, "All Time");
+        makeHPieGraph(ignored, "Ignored");
 
         for (const t of transactions) {
             let [m,d,y] = t.date.split("/");
@@ -92,20 +104,23 @@ const transactionInputChange = event => {
         const filterQuarter = () =>
             transactions.filter(t => t.year == year && t.quarter == quarter);
         let curQuarter = filterQuarter();
+        // By quarter:
         while (curQuarter.length) {
-            const {root, income} = labelTransactions(curQuarter);
-            makeFlowGraph({root, income}, `${year} Q${quarter + 1}`);
+            // const {root, income} = labelTransactions(curQuarter);
+            // makeFlowGraph({root, income}, `${year} Q${quarter + 1}`);
             year += quarter == 3;
             quarter = (quarter + 1) % 4;
             curQuarter = filterQuarter();
         }
 
+
+        // By year:
         year = minDateT.year;
         const filterYear = () =>
             transactions.filter(t => t.year == year);
         for (let curYear = filterYear(); curYear.length;) {
-            const {root, income} = labelTransactions(curYear);
-            makeFlowGraph({root, income}, `${year}`);
+            // const {root, income} = labelTransactions(curYear);
+            // makeFlowGraph({root, income}, `${year}`);
             year++;
             curYear = filterYear();
         }
@@ -153,6 +168,7 @@ const labelTransactions = transactions => {
             let elm = document.createElement("pre");
             elm.textContent = transaction.source;
             unlabeledDiv.appendChild(elm);
+            unlabeledDiv.style.display = "block";
         }
 
         let curCategory = categories;
@@ -168,7 +184,7 @@ const labelTransactions = transactions => {
 
     const ignored = categories.get("Ignored");
     categories.delete("Ignored");
-    // console.log("ignored:", ignored);
+    console.log("ignored:", ignored);
     const income = categories.get("Income");
     categories.delete("Income");
     console.log("income:", income);
@@ -199,10 +215,11 @@ const labelTransactions = transactions => {
     };
     let root = consolidate(new Map([["root", categories]]))[0];
     let incomeRoot = consolidate(new Map([["Income", income]]))[0];
+    let ignoredRoot = consolidate(new Map([["Ignored", ignored]]))[0];
     // console.log(JSON.stringify(encodeGraph(root)));
     // console.log("total:", root.total);
     console.log("no matching transactions:", classifiers.filter(c => !c.transactions));
-    return {root, income: incomeRoot};
+    return {root, income: incomeRoot, ignored: ignoredRoot};
 };
 
 const makeHPieGraph = (root, title) => {

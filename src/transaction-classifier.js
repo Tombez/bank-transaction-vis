@@ -50,20 +50,19 @@ const transactionInputChange = event => {
             t.amount = t.cols[amountField]
         });
 
-        // All time Flow:
-        const {root, income, ignored} = labelTransactions(transactions);
-        makeFlowGraph({root, income}, "All Time");
+        // Stats:
+        let statsElm = document.querySelector("#transaction-stats");
+        statsElm.innerText = `${transactions.length} total transactions.\n`;
+        let uniques = new Map();
+        for (const t of transactions) uniques.set(t.desc, 1);
+        statsElm.innerText += `${uniques.size} unique descriptions`;
 
         // All time ignored:
-        let layers = [];
-        fillLayers(ignored, layers);
-        let graph = new FlowGraph(layers, "All Time Ignored", {x: 1000, y: 600});
-        graphs.push(graph);
-        document.body.appendChild(graph.canvas);
-
-        // All time HPie:
-        makeHPieGraph(root, "All Time");
-        makeHPieGraph(ignored, "Ignored");
+        // let layers = [];
+        // fillLayers(ignored, layers);
+        // let graph = new FlowGraph(layers, "All Time Ignored", {x: 1000, y: 600});
+        // graphs.push(graph);
+        // document.body.appendChild(graph.canvas);
 
         for (const t of transactions) {
             let [m,d,y] = t.date.split("/");
@@ -78,52 +77,56 @@ const transactionInputChange = event => {
         const filterCustom = (start, end) =>
             transactions.filter(t => t.timestamp >= start && t.timestamp < end);
 
-
+        
         const minDateT = transactions.reduce((cur,min) =>
             cur.timestamp < min.timestamp ? cur : min);
         const maxDateT = transactions.reduce((cur,max) =>
             cur.timestamp > max.timestamp ? cur : max);
-
-        // let animDate = minDateT.timestamp;
-        // const animate = () => {
-        //     for (const graph of graphs) document.body.removeChild(graph.canvas);
-        //     while (graphs.pop());
-        //     const endDate = animDate + 1000 * 60 * 60 * 24 * 365.25;
-        //     let curTrans = filterCustom(animDate, endDate);
-        //     animDate += 1000 * 60 * 60 * 24;
-        //     const {root, income} = labelTransactions(curTrans);
-        //     makeFlowGraph({root, income}, `${dateToMDY(animDate)} to ${dateToMDY(endDate)}`);
-        //     //setTimeout(animate, 50);
-        // };
-        // animate();
-
-
+        const filterTransactions = (year, q) =>
+            transactions.filter(t =>
+                (!year || t.year == year) && (!(q+1) || t.quarter == q));
         
-        let {year, quarter} = minDateT;
-        console.log("minDate:", minDateT, "year " + year, "quarter " + quarter)
-        const filterQuarter = () =>
-            transactions.filter(t => t.year == year && t.quarter == quarter);
-        let curQuarter = filterQuarter();
-        // By quarter:
-        while (curQuarter.length) {
-            // const {root, income} = labelTransactions(curQuarter);
-            // makeFlowGraph({root, income}, `${year} Q${quarter + 1}`);
+        // Make options:
+        let options = "";
+        let year = minDateT.year, quarter = minDateT.quarter;
+        while (year < maxDateT.year || quarter <= maxDateT.quarter) {
+            const text = `${year} Q${quarter + 1}`;
+            options += `<option value="${year},${quarter}">${text}</option>\n`;
+            if (quarter == 3 || (year == maxDateT.year && quarter == maxDateT.quarter))
+                options += `<option value="${year}">${year}</option>\n`;
             year += quarter == 3;
             quarter = (quarter + 1) % 4;
-            curQuarter = filterQuarter();
         }
+        options += `<option value="all">All Time</option>`;
+        options = options.split("\n").reverse().join("\n");
 
+        // Make Settings
+        let settingsDiv = document.createElement("div");
+        settingsDiv.innerHTML = `
+            <label for="period">Choose a time period:</label>
+            <select id="period">${options}</select>`;
+        document.body.appendChild(settingsDiv);
+        const periodSelect = document.querySelector("#period");
+        periodSelect.addEventListener("change", ({target: {value}}) => {
+            while (graphs.length) document.body.removeChild(graphs.pop().canvas);
 
-        // By year:
-        year = minDateT.year;
-        const filterYear = () =>
-            transactions.filter(t => t.year == year);
-        for (let curYear = filterYear(); curYear.length;) {
-            // const {root, income} = labelTransactions(curYear);
-            // makeFlowGraph({root, income}, `${year}`);
-            year++;
-            curYear = filterYear();
-        }
+            let split = value.split(",").map(s => +s);
+            let title = value == "all" ? "All Time" :
+            split[0] + ((split[1] + 1) ? " Q" + (split[1] + 1) : "");
+            let filtered = filterTransactions(split[0], split[1]);
+            const {root, income, ignored} = labelTransactions(filtered);
+            makeFlowGraph({root, income}, title);
+            makeHPieGraph(root, title);
+        });
+
+        // Remove example:
+        while (graphs.length) document.body.removeChild(graphs.pop().canvas);
+
+        // All time Flow:
+        const {root, income, ignored} = labelTransactions(transactions);
+        makeFlowGraph({root, income}, "All Time");
+        // HPie:
+        makeHPieGraph(root, "All Time");
     };
     reader.readAsBinaryString(file);
 };
@@ -246,7 +249,7 @@ const makeFlowGraph = ({root, income}, title) => {
     root.name = "Spending";
     root.color = "#900";
     fillLayers(root, layers, layers.length);
-    console.log(layers);
+    console.log("Flow layers", layers);
 
     const deficit = income.total - root.total;
     if (deficit > 0) {
@@ -268,7 +271,7 @@ const makeFlowGraph = ({root, income}, title) => {
         root.left.push({vOffset: 1 - -deficit / root.total, piece: savings});
         layers[incomeLayersLen - 1].push(savings);
     }
-    
+
     let graph = new FlowGraph(layers, title, {x: 1000, y: 600});
     graphs.push(graph);
     document.body.appendChild(graph.canvas);
@@ -300,12 +303,15 @@ const labelTransaction = (date, desc, amount) => {
     return ["", ()=>{}];
 };
 
-const addClassifier = (type, unique, label) => {
-    let classifier = switchClassifier(type, unique, label);
-    classifier.type = type;
-    classifier.unique = unique.toString();
-    classifier.label = label;
-    classifiers.push(classifier);
+const addClassifier = (type, uniques, label) => {
+    if (!Array.isArray(uniques)) uniques = [uniques];
+    for (const unique of uniques) {
+        let classifier = switchClassifier(type, unique, label);
+        classifier.type = type;
+        classifier.unique = unique.toString();
+        classifier.label = label;
+        classifiers.push(classifier);
+    }
 };
 const switchClassifier = (type, unique, label) => {
     switch(type) {

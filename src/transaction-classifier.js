@@ -6,9 +6,13 @@ import("./rules.js").then(mod => {
 import HierarchalPieGraph from "./HierarchalPieGraph.js";
 import FlowGraph from "./FlowGraph.js";
 
-const dateToMDY = (n, sep = "/") => {
+const dateValToMDY = (n, sep = "/") => {
     const d = new Date(n);
     return d.getMonth() + 1 + sep + d.getDate() + sep + d.getFullYear();
+};
+const mdyToDate = (mdy, sep = "/") => {
+    let [m,d,y] = mdy.split(sep);
+    return new Date(y,m-1,d);
 };
 
 const canvasSize = {x: 600, y: 600};
@@ -17,13 +21,13 @@ let textInp = document.querySelector("#transaction-input");
 let unlabeledDiv = document.querySelector("#unlabeled");
 let classifiers = [];
 
-const loop = () => {
+const updateloop = () => {
     for (const graph of graphs) {
         graph.update();
     }
-    requestAnimationFrame(loop);
+    requestAnimationFrame(updateloop);
 };
-loop();
+updateloop();
 
 const transactionInputChange = event => {
     const file = event.target.files[0];
@@ -45,17 +49,16 @@ const transactionInputChange = event => {
         const descField = fieldIndices["Description"];
         const amountField = fieldIndices["Amount"];
         transactions.forEach(t => {
-            t.date = t.cols[dateField],
-            t.desc = t.cols[descField],
-            t.amount = t.cols[amountField]
+            t.date = t.cols[dateField];
+            t.desc = t.cols[descField];
+            t.amount = +t.cols[amountField];
         });
 
         // Stats:
         let statsElm = document.querySelector("#transaction-stats");
         statsElm.innerText = `${transactions.length} total transactions.\n`;
-        let uniques = new Map();
-        for (const t of transactions) uniques.set(t.desc, 1);
-        statsElm.innerText += `${uniques.size} unique descriptions`;
+        let uniqueDescs = [...new Set(transactions.map(t => t.desc))];
+        statsElm.innerText += `${uniqueDescs.length} unique descriptions`;
 
         // All time ignored:
         // let layers = [];
@@ -88,12 +91,15 @@ const transactionInputChange = event => {
         
         // Make options:
         let options = "";
+        const addOption = (value, text) =>
+            (options += `<option value="${value}">${text}</option>\n`);
         let year = minDateT.year, quarter = minDateT.quarter;
         while (year < maxDateT.year || quarter <= maxDateT.quarter) {
-            const text = `${year} Q${quarter + 1}`;
-            options += `<option value="${year},${quarter}">${text}</option>\n`;
-            if (quarter == 3 || (year == maxDateT.year && quarter == maxDateT.quarter))
-                options += `<option value="${year}">${year}</option>\n`;
+            addOption(`${year},${quarter}`, `${year} Q${quarter + 1}`);
+            if (year == maxDateT.year && quarter == maxDateT.quarter)
+                addOption(year, `${year} Ending ${maxDateT.month}/${maxDateT.day}`);
+            if (quarter == 3)
+                addOption(year, year);
             year += quarter == 3;
             quarter = (quarter + 1) % 4;
         }
@@ -119,7 +125,7 @@ const transactionInputChange = event => {
             makeHPieGraph(root, title);
         });
 
-        // Remove example:
+        // Remove examples:
         while (graphs.length) document.body.removeChild(graphs.pop().canvas);
 
         // All time Flow:
@@ -127,8 +133,102 @@ const transactionInputChange = event => {
         makeFlowGraph({root, income}, "All Time");
         // HPie:
         makeHPieGraph(root, "All Time");
+
+        // Account Balances:
+        transactions = transactions.filter(t => !t.desc.includes("Sweep"));
+        let accounts = new Map();
+        for (const t of transactions) {
+            const accountName = t.cols[0];
+            let account = accounts.get(accountName);
+            if (!account) accounts.set(accountName, account = {
+                transactions: [],
+                dailyChange: new Map()
+            });
+            account.transactions.push(t);
+            let date = t.cols[2] || t.cols[1];
+            let [m,d,y] = date.split("/");
+            let timestamp = +new Date(y,m-1,d);
+            let bal = account.dailyChange.get(timestamp) || 0;
+            account.dailyChange.set(timestamp, bal + t.amount);
+        }
+        for (const [accountName, account] of accounts.entries()) {
+            let {dailyChange} = account;
+            const stamps = Array.from(dailyChange.keys());
+            const dailyChangeEntries = Array.from(dailyChange.entries());
+            const minStamp = stamps.reduce((min, cur) => cur < min ? cur : min, Infinity);
+            const maxStamp = stamps.reduce((max, cur) => cur > max ? cur : max, -Infinity);
+            let dailyBalance = account.dailyBalance = [];
+            const msDay = 1000 * 60 * 60 * 24;
+            let i = 0;
+            let prevBal = 0;
+            dailyChangeEntries.sort(([stampA], [stampB]) => stampA - stampB);
+            console.log(accountName, "dailyChangeEntries:", dailyChangeEntries);
+            console.log(accountName, "transactions:", accounts.get(accountName).transactions);
+            for (const [stamp, change] of dailyChangeEntries) {
+                let stampI = Math.round((stamp - minStamp) / msDay) + 1; // + 1 to skip 0th slot
+                for (; i < stampI; ++i) dailyBalance[i] = prevBal;
+                dailyBalance[stampI] = prevBal += change;
+            }
+            let minBal = dailyBalance.reduce((min, cur) => cur < min ? cur : min, Infinity);
+            let maxBal = dailyBalance.reduce((max, cur) => cur > max ? cur : max, -Infinity);
+            const balDiff = maxBal - minBal;
+            if (!accountName.includes("Credit") && minBal < 0) {
+                for (let i = 0; i < dailyBalance.length; ++i)
+                    dailyBalance[i] -= minBal;
+                minBal -= minBal;
+                maxBal -= minBal;
+            }
+
+            let dataPoints = [];
+            for (let i = 0, len = dailyBalance.length; i < len; ++i) {
+                const bal = dailyBalance[i];
+                const y = (bal - minBal) / balDiff;
+                dataPoints.push({x: i / len, y});
+            }
+            
+            // Drawing setup
+            let canvas = document.createElement("canvas");
+            canvas.width = 500;
+            canvas.height = 400;
+            let ctx = canvas.getContext("2d");
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(0, canvas.height);
+            ctx.scale(1, -1);
+            
+            // Data line:
+            ctx.beginPath();
+            ctx.strokeStyle = "orange";
+            ctx.moveTo(dataPoints[0].x, dataPoints[0].y);
+            for (let i = 1; i < dataPoints.length; ++i) {
+                const point = dataPoints[i];
+                ctx.lineTo(point.x * canvas.width, point.y * canvas.height);
+            }
+            ctx.stroke();
+
+            // Y baseline:
+            ctx.beginPath();
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = "white";
+            const y0 = (0 - minBal) / balDiff;
+            ctx.moveTo(0, y0 * canvas.height);
+            ctx.lineTo(1 * canvas.width, y0 * canvas.height);
+            ctx.stroke();
+
+            ctx.restore();
+            // Draw Title:
+            ctx.fillStyle = "white";
+            ctx.font = "bold 16px Ubuntu";
+            ctx.fillText(accountName, canvas.width / 4, 20);
+            ctx.fillText(`min bal: ${minBal | 0}, max bal: ${maxBal | 0}`, canvas.width / 4, 40);
+            ctx.fillText(`first transaction date: ${dateValToMDY(minStamp)}`, canvas.width / 4, 60);
+            ctx.fillText(`last transaction date: ${dateValToMDY(maxStamp)}`, canvas.width / 4, 80);
+
+            document.body.appendChild(canvas);
+        }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsText(file);
 };
 
 const encodeGraph = root => {

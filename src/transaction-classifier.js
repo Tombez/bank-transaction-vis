@@ -5,17 +5,21 @@ import("./rules.js").then(mod => {
 });
 import HierarchalPieGraph from "./HierarchalPieGraph.js";
 import FlowGraph from "./FlowGraph.js";
-
-const dateValToMDY = (n, sep = "/") => {
-    const d = new Date(n);
-    return d.getMonth() + 1 + sep + d.getDate() + sep + d.getFullYear();
+import TransactionViewer from "./TransactionViewer.js";
+import {Color} from "./color-utils.js";
+import {dateValToMDY, mdyToDate} from "./date-utils.js";
+Array.prototype.best = function(toScore = a => a, direction = "min") {
+    const isBetter = "min" == direction ? (a, b) => a < b : (a, b) => a > b;
+    let bestValue = "min" == direction ? Infinity : -Infinity;
+    return this.reduce((best, cur) => {
+        const curValue = toScore(cur);
+        return isBetter(curValue, bestValue) ? 
+            (bestValue = curValue, cur) : 
+            best;
+    }, bestValue);
 };
-const mdyToDate = (mdy, sep = "/") => {
-    let [m,d,y] = mdy.split(sep);
-    return new Date(y,m-1,d);
-};
 
-const canvasSize = {x: 600, y: 600};
+const canvasSize = {x: 800, y: 800};
 const graphs = [];
 let textInp = document.querySelector("#transaction-input");
 let unlabeledDiv = document.querySelector("#unlabeled");
@@ -35,200 +39,398 @@ const transactionInputChange = event => {
     reader.onload = event => {
         const textContent = event.target.result;
         const csv = textContent.trim();
-        let transactions = csv.split("\n").map(line => ({
-            cols: line.split(","),
-            source: line
-        }));
-        let headers = transactions.shift().cols;
-        let fieldIndices = {};
-        for (let i = 0; i < headers.length; ++i) {
-            let header = headers[i];
-            fieldIndices[header] = i;
+        displayCSV(csv);
+        loadTransactions(csv);
+    };
+    reader.readAsText(file);
+};
+
+const displayCSV = (csv) => {
+    let transactions = csv.trim().split("\n").map(line => line.split(","));
+    let headers = transactions.shift();
+    let transElm = document.querySelector("#transactions");
+    while (transElm.children.length > 1)
+        transElm.removeChild(transElm.childNodes[transElm.childNodes.length - 1]);
+    let tViewer = new TransactionViewer(headers, transactions);
+    transElm.appendChild(tViewer.table);
+    transElm.style.display = "block";
+};
+
+const loadTransactions = (csv) => {
+    let transactions = csv.split("\n").map(line => ({
+        cols: line.split(","),
+        source: line
+    }));
+    let headers = transactions.shift().cols;
+    let fieldIndices = {};
+    for (let i = 0; i < headers.length; ++i) {
+        let header = headers[i];
+        fieldIndices[header] = i;
+    }
+    const dateField = fieldIndices["Transaction Date"];
+    const descField = fieldIndices["Description"];
+    const amountField = fieldIndices["Amount"];
+    transactions.forEach(t => {
+        t.date = t.cols[dateField];
+        t.desc = t.cols[descField];
+        t.amount = +t.cols[amountField];
+    });
+
+    for (const t of transactions) {
+        let [m,d,y] = t.date.split("/");
+        if (!/\d\d?\/\d\d?\/\d{4}/.test(t.date))
+            console.error("invalid date: ", t.date);
+        t.timestamp = +new Date(y,m-1,d);
+        t.year = +y;
+        t.quarter = (m - 1) / 3 | 0;
+        t.month = +m;
+        t.day = +d;
+    }
+    const filterCustom = (start, end) =>
+        transactions.filter(t => t.timestamp >= start && t.timestamp < end);
+    
+    const minDateT = transactions.best(({timestamp}) => timestamp);
+    const maxDateT = transactions.best(({timestamp}) => timestamp, "max");
+    const filterTransactions = (year, q) =>
+        transactions.filter(t =>
+            (!year || t.year == year) && (!(q+1) || t.quarter == q));
+    
+    // Make options:
+    let options = "";
+    const addOption = (value, text) =>
+        (options += `<option value="${value}">${text}</option>\n`);
+    let year = minDateT.year, quarter = minDateT.quarter;
+    while (year * 4 + quarter <= maxDateT.year * 4 + maxDateT.quarter) {
+        addOption(`${year},${quarter}`, `${year} Q${quarter + 1}`);
+        if (year == maxDateT.year && quarter == maxDateT.quarter)
+            addOption(year, `${year} Ending ${maxDateT.month}/${maxDateT.day}`);
+        else if (quarter == 3)
+            addOption(year, year);
+        year += quarter == 3;
+        quarter = (quarter + 1) % 4;
+    }
+    options += `<option value="all">All Time</option>`;
+    options = options.split("\n").reverse().join("\n");
+
+    let settingsDiv = document.createElement("div");
+    settingsDiv.innerHTML = `
+        <label for="period">Choose a time period:</label>
+        <select id="period">${options}</select>
+        <label for="duplicates">Filter repeat descriptions:</label>
+        <input type="checkbox" id="duplicates" name="duplicates" checked />`;
+    let transElm = document.querySelector("#transactions");
+    document.body.insertBefore(settingsDiv, transElm);
+    const duplicatesBox = document.querySelector("#duplicates");
+    const periodSelect = document.querySelector("#period");
+    const changePeriod = () => {
+        const periodValue = periodSelect.value;
+        while (graphs.length)
+            document.body.removeChild(graphs.pop().canvas);
+
+        let [year, quar] = periodValue.split(",").map(s => +s);
+        let title = periodValue == "all" ? "All Time" :
+            year + ((quar + 1) ? " Q" + (quar + 1) : "");
+        let filtered = filterTransactions(year, quar);
+
+        const {root, income, ignored} = labelTransactions(filtered);
+        makeFlowGraph({root, income}, title);
+        makeHPieGraph(root, title);
+
+        // Filter duplicates
+        if (duplicatesBox.checked) {
+            let descs = new Set();
+            filtered = filtered.filter(t => {
+                const isDup = descs.has(t.desc);
+                if (!isDup) descs.add(t.desc);
+                return !isDup;
+            });
         }
-        const dateField = fieldIndices["Transaction Date"];
-        const descField = fieldIndices["Description"];
-        const amountField = fieldIndices["Amount"];
-        transactions.forEach(t => {
-            t.date = t.cols[dateField];
-            t.desc = t.cols[descField];
-            t.amount = +t.cols[amountField];
-        });
 
         // Stats:
+        let uniqueDescs = [...new Set(filtered.map(t => t.desc))].length;
+        let unlabeled = filtered.filter(t => !t.labels[0]).length;
         let statsElm = document.querySelector("#transaction-stats");
         statsElm.innerText = `${transactions.length} total transactions.\n`;
-        let uniqueDescs = [...new Set(transactions.map(t => t.desc))];
-        statsElm.innerText += `${uniqueDescs.length} unique descriptions`;
+        statsElm.innerText += `Showing ${filtered.length} transactions.\n`;
+        statsElm.innerText += `${uniqueDescs} unique descriptions.\n`;
+        statsElm.innerText += `${unlabeled} transactions without label.`;
+    };
+    periodSelect.addEventListener("change", changePeriod);
+    duplicatesBox.addEventListener("change", changePeriod);
 
-        // All time ignored:
-        // let layers = [];
-        // fillLayers(ignored, layers);
-        // let graph = new FlowGraph(layers, "All Time Ignored", {x: 1000, y: 600});
-        // graphs.push(graph);
-        // document.body.appendChild(graph.canvas);
+    // Remove examples:
+    while (graphs.length) document.body.removeChild(graphs.pop().canvas);
 
-        for (const t of transactions) {
-            let [m,d,y] = t.date.split("/");
-            if (!/\d\d?\/\d\d?\/\d{4}/.test(t.date))
-                console.error("invalid date: ", t.date);
-            t.timestamp = +new Date(y,m-1,d);
-            t.year = +y;
-            t.quarter = (m - 1) / 3 | 0;
-            t.month = +m;
-            t.day = +d;
-        }
-        const filterCustom = (start, end) =>
-            transactions.filter(t => t.timestamp >= start && t.timestamp < end);
+    changePeriod();
 
-        
-        const minDateT = transactions.reduce((cur,min) =>
-            cur.timestamp < min.timestamp ? cur : min);
-        const maxDateT = transactions.reduce((cur,max) =>
-            cur.timestamp > max.timestamp ? cur : max);
-        const filterTransactions = (year, q) =>
-            transactions.filter(t =>
-                (!year || t.year == year) && (!(q+1) || t.quarter == q));
-        
-        // Make options:
-        let options = "";
-        const addOption = (value, text) =>
-            (options += `<option value="${value}">${text}</option>\n`);
-        let year = minDateT.year, quarter = minDateT.quarter;
-        while (year < maxDateT.year || quarter <= maxDateT.quarter) {
-            addOption(`${year},${quarter}`, `${year} Q${quarter + 1}`);
-            if (year == maxDateT.year && quarter == maxDateT.quarter)
-                addOption(year, `${year} Ending ${maxDateT.month}/${maxDateT.day}`);
-            if (quarter == 3)
-                addOption(year, year);
-            year += quarter == 3;
-            quarter = (quarter + 1) % 4;
-        }
-        options += `<option value="all">All Time</option>`;
-        options = options.split("\n").reverse().join("\n");
-
-        // Make Settings
-        let settingsDiv = document.createElement("div");
-        settingsDiv.innerHTML = `
-            <label for="period">Choose a time period:</label>
-            <select id="period">${options}</select>`;
-        document.body.appendChild(settingsDiv);
-        const periodSelect = document.querySelector("#period");
-        periodSelect.addEventListener("change", ({target: {value}}) => {
-            while (graphs.length) document.body.removeChild(graphs.pop().canvas);
-
-            let split = value.split(",").map(s => +s);
-            let title = value == "all" ? "All Time" :
-            split[0] + ((split[1] + 1) ? " Q" + (split[1] + 1) : "");
-            let filtered = filterTransactions(split[0], split[1]);
-            const {root, income, ignored} = labelTransactions(filtered);
-            makeFlowGraph({root, income}, title);
-            makeHPieGraph(root, title);
+    // Account Balances:
+    let nonSweepTrans = transactions.filter(t => !t.desc.includes("Sweep"));
+    nonSweepTrans = nonSweepTrans.filter(t => !t.desc.match(/(Buy|Sell) (VTI|EEMX|BGRN|EMB|MUB|STIP|VOTE|EFAX|ESML|CRBN|GME|SPYX)/));
+    nonSweepTrans = nonSweepTrans.filter(t => !t.desc.match(/Transfer Received from Another Account (VTI|EEMX|BGRN|EMB|MUB|STIP|VOTE|EFAX|ESML|CRBN|SPYX)/));
+    let accounts = new Map();
+    for (const t of nonSweepTrans) {
+        const accountName = t.cols[0];
+        let account = accounts.get(accountName);
+        if (!account) accounts.set(accountName, account = {
+            transactions: [],
+            dailyChange: new Map()
         });
-
-        // Remove examples:
-        while (graphs.length) document.body.removeChild(graphs.pop().canvas);
-
-        // All time Flow:
-        const {root, income, ignored} = labelTransactions(transactions);
-        makeFlowGraph({root, income}, "All Time");
-        // HPie:
-        makeHPieGraph(root, "All Time");
-
-        // Account Balances:
-        transactions = transactions.filter(t => !t.desc.includes("Sweep"));
-        let accounts = new Map();
-        for (const t of transactions) {
-            const accountName = t.cols[0];
-            let account = accounts.get(accountName);
-            if (!account) accounts.set(accountName, account = {
-                transactions: [],
-                dailyChange: new Map()
-            });
-            account.transactions.push(t);
-            let date = t.cols[2] || t.cols[1];
-            let [m,d,y] = date.split("/");
-            let timestamp = +new Date(y,m-1,d);
-            let bal = account.dailyChange.get(timestamp) || 0;
-            account.dailyChange.set(timestamp, bal + t.amount);
+        account.transactions.push(t);
+        let date = t.cols[2] || t.cols[1];
+        let timestamp = +mdyToDate(date);
+        let bal = account.dailyChange.get(timestamp) || 0;
+        account.dailyChange.set(timestamp, bal + t.amount);
+    }
+    for (const [accountName, account] of accounts.entries()) {
+        let {dailyChange} = account;
+        const stamps = Array.from(dailyChange.keys());
+        const dailyChangeEntries = Array.from(dailyChange.entries());
+        const minStamp = stamps.best();
+        const maxStamp = stamps.best(a => a, "max");
+        let dailyBalance = account.dailyBalance = [];
+        Date.msDay = 1000 * 60 * 60 * 24;
+        let i = 0;
+        let prevBal = 0;
+        dailyChangeEntries.sort(([stampA], [stampB]) => stampA - stampB);
+        console.log(accountName, account);
+        console.log(accountName, "transactions:", accounts.get(accountName).transactions);
+        for (const [stamp, change] of dailyChangeEntries) {
+            let stampI = Math.round((stamp - minStamp) / Date.msDay);
+            for (; i < stampI; ++i) dailyBalance[i] = prevBal;
+            dailyBalance[stampI] = prevBal += change;
         }
-        for (const [accountName, account] of accounts.entries()) {
-            let {dailyChange} = account;
-            const stamps = Array.from(dailyChange.keys());
-            const dailyChangeEntries = Array.from(dailyChange.entries());
-            const minStamp = stamps.reduce((min, cur) => cur < min ? cur : min, Infinity);
-            const maxStamp = stamps.reduce((max, cur) => cur > max ? cur : max, -Infinity);
-            let dailyBalance = account.dailyBalance = [];
-            const msDay = 1000 * 60 * 60 * 24;
-            let i = 0;
-            let prevBal = 0;
-            dailyChangeEntries.sort(([stampA], [stampB]) => stampA - stampB);
-            console.log(accountName, "dailyChangeEntries:", dailyChangeEntries);
-            console.log(accountName, "transactions:", accounts.get(accountName).transactions);
-            for (const [stamp, change] of dailyChangeEntries) {
-                let stampI = Math.round((stamp - minStamp) / msDay) + 1; // + 1 to skip 0th slot
-                for (; i < stampI; ++i) dailyBalance[i] = prevBal;
-                dailyBalance[stampI] = prevBal += change;
-            }
-            let minBal = dailyBalance.reduce((min, cur) => cur < min ? cur : min, Infinity);
-            let maxBal = dailyBalance.reduce((max, cur) => cur > max ? cur : max, -Infinity);
-            const balDiff = maxBal - minBal;
-            if (!accountName.includes("Credit") && minBal < 0) {
-                for (let i = 0; i < dailyBalance.length; ++i)
-                    dailyBalance[i] -= minBal;
-                minBal -= minBal;
-                maxBal -= minBal;
-            }
+        let minBal = dailyBalance.best();
+        let maxBal = dailyBalance.best(a => a, "max");
+        if (!accountName.includes("Credit") && minBal < 0) {
+            for (let i = 0; i < dailyBalance.length; ++i)
+                dailyBalance[i] -= minBal;
+            maxBal -= minBal;
+            minBal -= minBal;
+        }
+        account.minStamp = minStamp;
+        account.maxStamp = maxStamp;
+        account.minBal = minBal;
+        account.maxBal = maxBal;
+    }
 
+    const accountValues = Array.from(accounts.values());
+    const minStamp = accountValues.best(({minStamp}) => minStamp).minStamp;
+    const maxStamp = accountValues.best(({maxStamp}) => maxStamp, "max").maxStamp;
+    const stampDiff = maxStamp - minStamp;
+    const minBal = accountValues.best(({minBal}) => minBal).minBal;
+    const maxBal = accountValues.best(({maxBal}) => maxBal, "max").maxBal;
+    const balDiff = maxBal - minBal;
+    
+    // Drawing setup
+    let canvas = document.createElement("canvas");
+    canvas.width = 1000;
+    canvas.height = 800;
+    let ctx = canvas.getContext("2d");
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const tempCtx = (ctx, cb) => {ctx.save(); cb(); ctx.restore()};
+    tempCtx(ctx, () => {
+        const axisSpace = {x: 50, y: 50};
+        ctx.translate(axisSpace.x, canvas.height - axisSpace.y);
+        const axisScaler = {x: (canvas.width - axisSpace.x) / canvas.width,
+            y: ((canvas.height - axisSpace.y) / canvas.height)};
+        ctx.scale(axisScaler.x, -1 * axisScaler.y * 0.95);
+
+        // Draw X Axes:
+        ctx.strokeStyle = "white";
+        ctx.fillStyle = "white";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.font = "bold 16px Ubuntu";
+        ctx.globalAlpha = 0.4;
+        const yStep = 2000;
+        ctx.beginPath();
+        for (let y = Math.floor(minBal / yStep) * yStep; y < maxBal; y += yStep) {
+            const drawY = (y - minBal) / balDiff * canvas.height;
+            ctx.moveTo(0, drawY);
+            ctx.lineTo(canvas.width, drawY);
+            tempCtx(ctx, () => {
+                ctx.globalAlpha = 1;
+                ctx.translate(-5, drawY);
+                ctx.scale(1.4, -1.4);
+                ctx.fillText(`$${y/1000|0}k`, 0, 0);
+            });
+        }
+        // Draw Y Axes:
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        const minYear = new Date(minStamp).getFullYear();
+        const maxYear = new Date(maxStamp).getFullYear();
+        for (let year = minYear; year <= maxYear; ++year) {
+            const x = +new Date(year, 0, 1);
+            const drawX = (x - minStamp) / stampDiff * canvas.width;
+            ctx.moveTo(drawX, 0);
+            ctx.lineTo(drawX, canvas.height);
+            tempCtx(ctx, () => {
+                ctx.globalAlpha = 1;
+                ctx.translate(drawX, -5);
+                ctx.scale(1.4, -1.4);
+                ctx.fillText(`'${new Date(x).getFullYear()-2000}`, 0, 0);
+            });
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        // Generate Colors:
+        let colors = new Array(accounts.size).fill(0).map(_ => Color());
+        let count = 0;
+        for (let step = 0.1; count < 20; step *= 0.6, count++) {
+            let pairs = [];
+            for (let i = 0; i < colors.length; ++i) {
+                const color = colors[i];
+                let nearest = null;
+                for (let j = 0; j < colors.length; ++j) {
+                    if (j == i) continue;
+                    const cur = colors[j];
+                    const dist = color.dist(cur);
+                    if (!nearest || dist < color.dist(nearest))
+                        nearest = cur;
+                }
+                pairs.push([color, nearest]);
+            }
+            const moveFromExtremes = a => {
+                const margin = 0.20;
+                if (a.length() < margin) a.normalize().scale(0.25);
+                const fromWhite = a.diff(Color(1, 1, 1));
+                const distWhite = fromWhite.length();
+                if (distWhite < margin)
+                    a.add(fromWhite.normalize().scale(margin - distWhite));
+            };
+            for (let [a, b] of pairs) {
+                const vector = a.diff(b).normalize().scale(step/2);
+                a.add(vector).clamp();
+                moveFromExtremes(a);
+                b.add(vector.scale(-1)).clamp();
+                moveFromExtremes(b);
+            }
+        }
+        
+        // Draw Data lines:
+        ctx.lineWidth = 2;
+        for (const [accountName, account] of accounts.entries()) {
+            const {dailyBalance} = account;
+            
+            account.color = colors.shift();
+            ctx.strokeStyle = account.color.toString();
             let dataPoints = [];
             for (let i = 0, len = dailyBalance.length; i < len; ++i) {
                 const bal = dailyBalance[i];
+                const stamp = account.minStamp + i * Date.msDay;
+                const x = (stamp - minStamp) / stampDiff;
                 const y = (bal - minBal) / balDiff;
-                dataPoints.push({x: i / len, y});
+                dataPoints.push({x, y});
             }
-            
-            // Drawing setup
-            let canvas = document.createElement("canvas");
-            canvas.width = 500;
-            canvas.height = 400;
-            let ctx = canvas.getContext("2d");
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.save();
-            ctx.translate(0, canvas.height);
-            ctx.scale(1, -1);
-            
-            // Data line:
+
             ctx.beginPath();
-            ctx.strokeStyle = "orange";
-            ctx.moveTo(dataPoints[0].x, dataPoints[0].y);
+            ctx.moveTo(dataPoints[0].x * canvas.width, dataPoints[0].y * canvas.height);
             for (let i = 1; i < dataPoints.length; ++i) {
                 const point = dataPoints[i];
                 ctx.lineTo(point.x * canvas.width, point.y * canvas.height);
             }
             ctx.stroke();
-
-            // Y baseline:
-            ctx.beginPath();
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = "white";
-            const y0 = (0 - minBal) / balDiff;
-            ctx.moveTo(0, y0 * canvas.height);
-            ctx.lineTo(1 * canvas.width, y0 * canvas.height);
-            ctx.stroke();
-
-            ctx.restore();
-            // Draw Title:
-            ctx.fillStyle = "white";
-            ctx.font = "bold 16px Ubuntu";
-            ctx.fillText(accountName, canvas.width / 4, 20);
-            ctx.fillText(`min bal: ${minBal | 0}, max bal: ${maxBal | 0}`, canvas.width / 4, 40);
-            ctx.fillText(`first transaction date: ${dateValToMDY(minStamp)}`, canvas.width / 4, 60);
-            ctx.fillText(`last transaction date: ${dateValToMDY(maxStamp)}`, canvas.width / 4, 80);
-
-            document.body.appendChild(canvas);
         }
-    };
-    reader.readAsText(file);
+
+        // Y baseline:
+        ctx.beginPath();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "white";
+        const y0 = (0 - minBal) / balDiff;
+        ctx.moveTo(0, y0 * canvas.height);
+        ctx.lineTo(1 * canvas.width, y0 * canvas.height);
+        ctx.stroke();
+    });
+
+    // Draw Title:
+    ctx.textBaseline = "bottom";
+    ctx.fillStyle = "white";
+    ctx.font = "bold 22px Ubuntu";
+    ctx.fillText("Account Balances Over Time", canvas.width / 4, 20);
+    ctx.font = "bold 18px Ubuntu";
+    ctx.fillText(`min bal: ${minBal | 0}, max bal: ${maxBal | 0}`, canvas.width / 4, 40);
+    ctx.fillText(`first transaction date: ${dateValToMDY(minStamp)}`, canvas.width / 4, 60);
+    ctx.fillText(`last transaction date: ${dateValToMDY(maxStamp)}`, canvas.width / 4, 80);
+
+    // Draw Graph Key:
+    const keyFontSize = 16;
+    ctx.font = `bold ${keyFontSize}px Ubuntu`;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    let y = 0;
+    for (const [accountName, account] of accounts.entries()) {
+        ctx.fillStyle = "white";
+        ctx.fillText(accountName, canvas.width - 30, y += keyFontSize + 4);
+        ctx.fillStyle = account.color;
+        ctx.fillRect(canvas.width - 20, y - 7, 10, 10);
+    }
+
+    document.body.appendChild(canvas);
+
+
+    // Make Total Account Balance Graph:
+    {
+        const totalDailyBalance = [];
+        for (let d = minStamp, i = 0; d < maxStamp; d += Date.msDay, ++i) {
+            let total = 0;
+            for (const account of accounts.values()) {
+                if (account.minStamp <= d) {
+                    let index = Math.round((d - account.minStamp) / Date.msDay);
+                    if (d > account.maxStamp)
+                        index = account.dailyBalance.length - 1;
+                    total += account.dailyBalance[index];
+                }
+            }
+            totalDailyBalance[i] = total;
+        }
+
+        let dataPoints = [];
+        for (let i = 0, len = totalDailyBalance.length; i < len; ++i) {
+            const bal = totalDailyBalance[i];
+            const stamp = minStamp + i * Date.msDay;
+            const x = (stamp - minStamp) / stampDiff;
+            const y = (bal - minBal) / balDiff;
+            dataPoints.push({x, y});
+        }
+
+        // Drawing setup
+        let canvas = document.createElement("canvas");
+        canvas.width = 1000;
+        canvas.height = 800;
+        let ctx = canvas.getContext("2d");
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        tempCtx(ctx, () => {
+            const axisSpace = {x: 50, y: 50};
+            ctx.translate(axisSpace.x, canvas.height - axisSpace.y);
+            const axisScaler = {x: (canvas.width - axisSpace.x) / canvas.width,
+                y: ((canvas.height - axisSpace.y) / canvas.height)};
+            ctx.scale(axisScaler.x, -1 * axisScaler.y * 0.80);
+
+            // Draw Data line:
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "orange";
+            ctx.beginPath();
+            ctx.moveTo(dataPoints[0].x * canvas.width, dataPoints[0].y * canvas.height);
+            for (let i = 1; i < dataPoints.length; ++i) {
+                const point = dataPoints[i];
+                ctx.lineTo(point.x * canvas.width, point.y * canvas.height);
+            }
+            ctx.stroke();
+        });
+
+         // Draw Title:
+        ctx.textBaseline = "top";
+        ctx.fillStyle = "white";
+        ctx.font = "bold 22px Ubuntu";
+        ctx.fillText("Net Worth Over Time", canvas.width / 4, 20);
+
+        document.body.appendChild(canvas);
+    }
 };
 
 const encodeGraph = root => {
@@ -254,6 +456,10 @@ const decodeGraph = array => {
 const labelTransactions = transactions => {
     let categories = new Map();
 
+    // Remove unlabeled:
+    unlabeledDiv.innerHTML = "";
+
+    // Match longer and therefore more specific rules first:
     classifiers.sort((a,b) => b.unique.length - a.unique.length);
 
     for (const transaction of transactions) {
@@ -424,8 +630,8 @@ const switchClassifier = (type, unique, label) => {
         case "custom":
             return (date,desc,amount) => unique(date,desc,amount) && label;
         default:
-            throw new TypeError(`Unknown type "${type}"`);
-    }
+            throw new TypeError(`Unknown rule type "${type}"`);
+    };
 };
 
 const makeExample = event => {
@@ -436,6 +642,19 @@ const makeExample = event => {
         res.json().then(encoded => {
             const root = decodeGraph(encoded);
             makeHPieGraph(root, "Example");
+            const income = {
+                name: "Income",
+                children: [{
+                    name: "Salary",
+                    total: 104000
+                }, {
+                    name: "Interest",
+                    total: 2000
+                }],
+                total: 106000,
+                color: "#285"
+            };
+            makeFlowGraph({root, income}, "Example");
         });
     });
 };

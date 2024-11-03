@@ -4,7 +4,7 @@ export default class HierarchyGraph {
     constructor(root, title, canvasSize) {
         this.root = root;
         this.title = title;
-        this.outerRadius = 350;
+        this.outerRadius = 450;
         this.innerRadius = 40;
         this.canvas = document.createElement("canvas");
         this.ctx = this.canvas.getContext("2d");
@@ -37,15 +37,13 @@ export default class HierarchyGraph {
 
             // Find closest text to mouse
             const [minText, minDist] = this.texts.reduce(([minText, min], text) => {
-                const tx = text[4];
-                const ty = text[5];
+                const tx = text.drawLoc.x;
+                const ty = text.drawLoc.y;
 
-                const difX = x-tx;
-                const difY = y-ty;
-                const distSq = difX**2+difY**2;
+                const distSq = (x - tx) ** 2 + (y - ty) ** 2;
                 return distSq < min ? [text, distSq] : [minText, min];
             }, [null, Infinity]);
-            if (minDist<20**2) this.dragging = minText;
+            if (minDist < 20 ** 2) this.dragging = minText;
         });
         this.canvas.addEventListener("mouseup", event => {
             this.dragging = null;
@@ -54,27 +52,27 @@ export default class HierarchyGraph {
             this.mouse.x = event.offsetX - event.target.width / 2;
             this.mouse.y = event.offsetY - event.target.height / 2;
             if (this.dragging) {
-                this.dragging[4] = this.mouse.x;
-                this.dragging[5] = this.mouse.y;
+                this.dragging.drawLoc.x = this.mouse.x;
+                this.dragging.drawLoc.y = this.mouse.y;
             }
         });
     }
     textCollisions() {
         for (let i = 0; i < this.texts.length; ++i) {
-            const a = this.texts[i];
+            const a = this.texts[i].drawLoc;
             for (let j = i + 1; j < this.texts.length; j++) {
-                const b = this.texts[j];
-                const difX = a[4]-b[4];
-                const difY = a[5]-b[5];
-                if (difX**2+difY**2<20**2) {
-                    a[4] += difX / 100;
-                    a[5] += difY / 100;
-                    b[4] -= difX / 100;
-                    b[5] -= difY / 100;
-                    a[4] += a[4] / 400;
-                    a[5] += a[5] / 400;
-                    b[4] += b[4] / 400;
-                    b[5] += b[5] / 400;
+                const b = this.texts[j].drawLoc;
+                const difX = a.x - b.x;
+                const difY = a.y - b.y;
+                if (Math.hypot(difX, difY) < 20) {
+                    a.x += difX / 100;
+                    a.y += difY / 100;
+                    b.x -= difX / 100;
+                    b.y -= difY / 100;
+                    a.x += a.x / 400;
+                    a.y += a.y / 400;
+                    b.x += b.x / 400;
+                    b.y += b.y / 400;
                 }
             }
         }
@@ -117,7 +115,7 @@ export default class HierarchyGraph {
     }
     calculate() {
         this.checkHover();
-        this.textCollisions();
+        // this.textCollisions();
     }
     draw() {
         this.ctx.save();
@@ -165,14 +163,16 @@ export default class HierarchyGraph {
 
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
-        for (let [text, ox, oy, ang, dx, dy] of this.texts) {
-            this.ctx.font = "bold 20px Arial";
+        for (let cur of this.texts) {
+            const {text, home, drawLoc, angle} = cur;
+            const fontSize = 20;
+            this.ctx.font = `bold ${fontSize}px Arial`;
 
             this.ctx.beginPath();
             this.ctx.lineWidth = 2.5;
             this.ctx.strokeStyle = "#000";
-            this.ctx.moveTo(ox, oy);
-            this.ctx.lineTo(dx, dy);
+            this.ctx.moveTo(home.x, home.y);
+            this.ctx.lineTo(drawLoc.x, drawLoc.y);
             this.ctx.stroke();
 
             this.ctx.lineWidth = 1;
@@ -180,9 +180,9 @@ export default class HierarchyGraph {
             this.ctx.stroke();
 
             this.ctx.save();
-            this.ctx.translate(dx, dy);
-            this.ctx.rotate(ang);
-            this.ctx.lineWidth = 0.8;
+            this.ctx.translate(drawLoc.x, drawLoc.y);
+            this.ctx.rotate(angle);
+            this.ctx.lineWidth = 0.8 * fontSize / 20;
             this.ctx.strokeStyle = "#000";
             this.ctx.fillText(text, 0, 0);
             this.ctx.strokeText(text, 0, 0);
@@ -244,7 +244,13 @@ export default class HierarchyGraph {
             let drawAngle = (midAngle + Math.PI*2) % (Math.PI*2);
             if (drawAngle > 0.5*Math.PI && drawAngle < 1.5*Math.PI)
                 drawAngle += Math.PI;
-            this.texts.push([cur.name, textX, textY, drawAngle, textX, textY]);
+            let ctx = document.createElement("canvas").getContext("2d");
+            this.texts.push({
+                text: cur.name,
+                home: {x: textX, y: textY},
+                angle: drawAngle,
+                drawLoc: {x: textX, y: textY}
+            });
 
             const newOuterRad = Math.sqrt(2*outrRad**2-inrRad**2);
 

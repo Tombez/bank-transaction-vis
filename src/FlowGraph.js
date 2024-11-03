@@ -139,7 +139,6 @@ export default class FlowGraph {
         }
         ctx.globalAlpha = 1;
 
-        ctx.fillStyle = "#fff";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         
@@ -147,8 +146,22 @@ export default class FlowGraph {
             for (const piece of col) {
                 // if (piece.height < 2) continue;
                 const fontSize = piece == this.closestPiece ? 16 : 12;
+                const drawX = col.x + this.barWidth / 2;
+                const drawY = piece.y + piece.height / 2 - 1;
+                const text = piece.name + " $" + Math.round(piece.total).toLocaleString();
+                const pad = 3; // pixels
+
                 ctx.font = `bold ${fontSize}px Arial`;
-                ctx.fillText(piece.name + " $" + Math.round(piece.total).toLocaleString(), col.x + this.barWidth / 2, piece.y + piece.height / 2 - 1);
+                const backdropW = ctx.measureText(text).width + pad * 2
+                const backdropH = fontSize + pad * 2;;
+
+                ctx.fillStyle = "black";
+                ctx.globalAlpha = 0.5;
+                ctx.fillRect(drawX - backdropW / 2, drawY - backdropH / 2, backdropW, backdropH);
+                ctx.globalAlpha = 1;
+                
+                ctx.fillStyle = "#fff";
+                ctx.fillText(text, drawX, drawY);
             }
         }
 

@@ -12,11 +12,22 @@
         canvas {
             margin: 4px;
         }
-        #unlabeled {
+        #transactions {
             display: none;
             border: 2px solid black;
+            width: fit-content;
             max-height: 80%;
-            overflow: scroll;
+            overflow-y: scroll;
+        }
+        table {
+            border-collapse: collapse;
+            font-family: "Ubuntu", system-ui;
+        }
+        td, th {
+            border: 1px solid aliceblue;
+        }
+        td {
+            padding-left: 3px;
         }
     </style>
     <script src="./transaction-classifier.js" type="module"></script>
@@ -25,8 +36,9 @@
     <input id="transaction-input" type="file" accept=".csv,.txt">
     <button id="submit">Enter</button>
     <div id="transaction-stats"></div>
-    <div id="unlabeled">
-        <h2>Unlabeled Transactions</h2>
+    <div id="transactions">
+        <h2>CSV Viewer</h2>
     </div>
+    <div id="unlabeled"></div>
     <br>
 </body>

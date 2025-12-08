@@ -21,7 +21,7 @@ export default class FlowGraph {
             const x = this.mouse.x = event.offsetX;
             const y = this.mouse.y = event.offsetY;
 
-            console.log(this.closestPiece.transactions.map(t=>t.source).join("\n"));
+            console.log(this.closestPiece.transactions.map(t=>t.cols.join(",")).join("\n"));
         });
         this.canvas.addEventListener("mouseup", event => {
             

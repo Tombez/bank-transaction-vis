@@ -6,8 +6,10 @@ import("./rules.js").then(mod => {
 import HierarchalPieGraph from "./HierarchalPieGraph.js";
 import FlowGraph from "./FlowGraph.js";
 import TransactionViewer from "./TransactionViewer.js";
+import {CSV, removeCR} from "./CSVTable.js";
 import {Color} from "./color-utils.js";
-import {dateValToMDY, mdyToDate} from "./date-utils.js";
+import {dateValToMdy, dateToYmd, mdyToDate} from "./date-utils.js";
+import BarGraph from "./BarGraph.js";
 Array.prototype.best = function(toScore = a => a, direction = "min") {
     const isBetter = "min" == direction ? (a, b) => a < b : (a, b) => a > b;
     let bestValue = "min" == direction ? Infinity : -Infinity;
@@ -37,8 +39,8 @@ const transactionInputChange = event => {
     const file = event.target.files[0];
     let reader = new FileReader();
     reader.onload = event => {
-        const textContent = event.target.result;
-        const csv = textContent.trim();
+        const text = event.target.result;
+        const csv = new CSV(text);
         displayCSV(csv);
         loadTransactions(csv);
     };
@@ -46,8 +48,8 @@ const transactionInputChange = event => {
 };
 
 const displayCSV = (csv) => {
-    let transactions = csv.trim().split("\n").map(line => line.split(","));
-    let headers = transactions.shift();
+    let transactions = csv.rows;
+    let headers = csv.headers;
     let transElm = document.querySelector("#transactions");
     while (transElm.children.length > 1)
         transElm.removeChild(transElm.childNodes[transElm.childNodes.length - 1]);
@@ -57,11 +59,10 @@ const displayCSV = (csv) => {
 };
 
 const loadTransactions = (csv) => {
-    let transactions = csv.split("\n").map(line => ({
-        cols: line.split(","),
-        source: line
+    let transactions = csv.rows.map(row => ({
+        cols: row
     }));
-    let headers = transactions.shift().cols;
+    let headers = csv.headers;
     let fieldIndices = {};
     for (let i = 0; i < headers.length; ++i) {
         let header = headers[i];
@@ -74,6 +75,7 @@ const loadTransactions = (csv) => {
         t.date = t.cols[dateField];
         t.desc = t.cols[descField];
         t.amount = +t.cols[amountField];
+        if (isNaN(t.amount)) debugger;
     });
 
     for (const t of transactions) {
@@ -94,6 +96,33 @@ const loadTransactions = (csv) => {
     const filterTransactions = (year, q) =>
         transactions.filter(t =>
             (!year || t.year == year) && (!(q+1) || t.quarter == q));
+
+    // Make Quarterly Interest Graph:
+    const addGraphForCategory = (category, title = category, invert = false) => {
+        labelTransactions(transactions);
+        let year = minDateT.year, quarter = minDateT.quarter;
+        let interestCSV = "";
+        let interestData = [], interestLabels = [];
+        while (year * 4 + quarter <= maxDateT.year * 4 + maxDateT.quarter) {
+            let filtered = filterTransactions(year, quarter);
+            filtered = filtered.filter(t => t.labels.includes(category));
+            let interest = filtered.reduce((sum, t) => sum + t.amount, 0);
+            if (invert) interest *= -1;
+            interest = interest.toFixed(2);
+            const label = `${year} Q${quarter + 1}`;
+            interestCSV += `${label}, ${interest}\n`;
+            interestData.push(interest);
+            interestLabels.push(label);
+            year += quarter == 3;
+            quarter = (quarter + 1) % 4;
+        }
+        let interestGraph = new BarGraph(title, interestData, interestLabels, canvasSize.x, 500);
+        document.body.appendChild(interestGraph.container);
+        console.log(interestCSV);
+    };
+    addGraphForCategory('Interest', 'Quarterly Interest Earned');
+    addGraphForCategory('Food', 'Quarterly Food Spending', true);
+    addGraphForCategory('Fuel', 'Quarterly Fuel Spending', true);
     
     // Make options:
     let options = "";
@@ -128,8 +157,7 @@ const loadTransactions = (csv) => {
             document.body.removeChild(graphs.pop().canvas);
 
         let [year, quar] = periodValue.split(",").map(s => +s);
-        let title = periodValue == "all" ? "All Time" :
-            year + ((quar + 1) ? " Q" + (quar + 1) : "");
+        let title = periodSelect.selectedOptions[0].text;
         let filtered = filterTransactions(year, quar);
 
         const {root, income, ignored} = labelTransactions(filtered);
@@ -164,9 +192,10 @@ const loadTransactions = (csv) => {
     changePeriod();
 
     // Account Balances:
-    let nonSweepTrans = transactions.filter(t => !t.desc.includes("Sweep"));
-    nonSweepTrans = nonSweepTrans.filter(t => !t.desc.match(/(Buy|Sell) (VTI|EEMX|BGRN|EMB|MUB|STIP|VOTE|EFAX|ESML|CRBN|GME|SPYX)/));
-    nonSweepTrans = nonSweepTrans.filter(t => !t.desc.match(/Transfer Received from Another Account (VTI|EEMX|BGRN|EMB|MUB|STIP|VOTE|EFAX|ESML|CRBN|SPYX)/));
+    let nonSweepTrans = transactions.filter(t => !t.desc.includes("Sweep") || t.desc == "Cash Sweep Interest");
+    nonSweepTrans = nonSweepTrans.filter(t => !t.desc.match(/(Buy|Sell) [A-Z]{3,4}/));
+    nonSweepTrans = nonSweepTrans.filter(t => !t.desc.match(/Transfer Received from Another Account [A-Z]{3,4}/));
+    nonSweepTrans = nonSweepTrans.filter(t => !t.desc.startsWith("Amazon Order "));
     let accounts = new Map();
     for (const t of nonSweepTrans) {
         const accountName = t.cols[0];
@@ -228,8 +257,8 @@ const loadTransactions = (csv) => {
     let ctx = canvas.getContext("2d");
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const tempCtx = (ctx, cb) => {ctx.save(); cb(); ctx.restore()};
-    tempCtx(ctx, () => {
+    ctx.temp = function (cb) {this.save(); cb(); this.restore()};
+    ctx.temp(() => {
         const axisSpace = {x: 50, y: 50};
         ctx.translate(axisSpace.x, canvas.height - axisSpace.y);
         const axisScaler = {x: (canvas.width - axisSpace.x) / canvas.width,
@@ -249,7 +278,7 @@ const loadTransactions = (csv) => {
             const drawY = (y - minBal) / balDiff * canvas.height;
             ctx.moveTo(0, drawY);
             ctx.lineTo(canvas.width, drawY);
-            tempCtx(ctx, () => {
+            ctx.temp(() => {
                 ctx.globalAlpha = 1;
                 ctx.translate(-5, drawY);
                 ctx.scale(1.4, -1.4);
@@ -266,7 +295,7 @@ const loadTransactions = (csv) => {
             const drawX = (x - minStamp) / stampDiff * canvas.width;
             ctx.moveTo(drawX, 0);
             ctx.lineTo(drawX, canvas.height);
-            tempCtx(ctx, () => {
+            ctx.temp(() => {
                 ctx.globalAlpha = 1;
                 ctx.translate(drawX, -5);
                 ctx.scale(1.4, -1.4);
@@ -352,8 +381,8 @@ const loadTransactions = (csv) => {
     ctx.fillText("Account Balances Over Time", canvas.width / 4, 20);
     ctx.font = "bold 18px Ubuntu";
     ctx.fillText(`min bal: ${minBal | 0}, max bal: ${maxBal | 0}`, canvas.width / 4, 40);
-    ctx.fillText(`first transaction date: ${dateValToMDY(minStamp)}`, canvas.width / 4, 60);
-    ctx.fillText(`last transaction date: ${dateValToMDY(maxStamp)}`, canvas.width / 4, 80);
+    ctx.fillText(`first transaction date: ${dateValToMdy(minStamp)}`, canvas.width / 4, 60);
+    ctx.fillText(`last transaction date: ${dateValToMdy(maxStamp)}`, canvas.width / 4, 80);
 
     // Draw Graph Key:
     const keyFontSize = 16;
@@ -388,48 +417,29 @@ const loadTransactions = (csv) => {
         }
 
         let dataPoints = [];
+        const labels = [];
+        let prevYear = -Infinity;
         for (let i = 0, len = totalDailyBalance.length; i < len; ++i) {
             const bal = totalDailyBalance[i];
             const stamp = minStamp + i * Date.msDay;
+            const date = new Date(stamp);
+            const year = +date.getFullYear();
+            let label = "";
+            const isFirstOrLast = prevYear == -Infinity || i + 1 == len;
+            if (year > prevYear || isFirstOrLast) {
+                prevYear = year;
+                label = isFirstOrLast ? dateToYmd(date) : date.getFullYear();
+            }
+            labels.push(label);
             const x = (stamp - minStamp) / stampDiff;
             const y = (bal - minBal) / balDiff;
             dataPoints.push({x, y});
         }
 
-        // Drawing setup
-        let canvas = document.createElement("canvas");
-        canvas.width = 1000;
-        canvas.height = 800;
-        let ctx = canvas.getContext("2d");
-        ctx.fillStyle = "black";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        tempCtx(ctx, () => {
-            const axisSpace = {x: 50, y: 50};
-            ctx.translate(axisSpace.x, canvas.height - axisSpace.y);
-            const axisScaler = {x: (canvas.width - axisSpace.x) / canvas.width,
-                y: ((canvas.height - axisSpace.y) / canvas.height)};
-            ctx.scale(axisScaler.x, -1 * axisScaler.y * 0.80);
-
-            // Draw Data line:
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = "orange";
-            ctx.beginPath();
-            ctx.moveTo(dataPoints[0].x * canvas.width, dataPoints[0].y * canvas.height);
-            for (let i = 1; i < dataPoints.length; ++i) {
-                const point = dataPoints[i];
-                ctx.lineTo(point.x * canvas.width, point.y * canvas.height);
-            }
-            ctx.stroke();
-        });
-
-         // Draw Title:
-        ctx.textBaseline = "top";
-        ctx.fillStyle = "white";
-        ctx.font = "bold 22px Ubuntu";
-        ctx.fillText("Net Worth Over Time", canvas.width / 4, 20);
-
-        document.body.appendChild(canvas);
+        let netWorthGraph = new BarGraph("Net Worth Over Time", totalDailyBalance, labels, canvasSize.x, 400);
+        console.log("net worth graph", netWorthGraph);
+        window.netWorthGraph = netWorthGraph;
+        document.body.appendChild(netWorthGraph.container);
     }
 };
 
@@ -475,7 +485,7 @@ const labelTransactions = transactions => {
 
         if (!category) {
             let elm = document.createElement("pre");
-            elm.textContent = transaction.source;
+            elm.textContent = transaction.cols.join(",");
             unlabeledDiv.appendChild(elm);
             unlabeledDiv.style.display = "block";
         }
@@ -503,13 +513,13 @@ const labelTransactions = transactions => {
         return Array.from(map.entries()).map(([name, val]) => {
             let children = consolidate(val);
             if (!children.length) children = null;
-            const transactions = val.transactions;
+            const transactions = val?.transactions ?? [];
             const transactionsTotal =
-                (transactions || []).reduce((sum,c)=>sum+(-c.amount),0);
+                transactions.reduce((sum,c)=>sum+(-c.amount),0);
             const childrenTotal =
                 (children || []).reduce((sum, c) => sum + c.total, 0);
             const total = Math.abs(transactionsTotal + childrenTotal);
-            const numTransactions = (transactions ? transactions.length : 0) +
+            const numTransactions = transactions.length +
                 (children || []).reduce((sum, c) => sum + c.numTransactions, 0);
             return ({
                 name,
@@ -586,18 +596,18 @@ const makeFlowGraph = ({root, income}, title) => {
 const fillLayers = (root, layers, index = 0) => { // recursive
     if (!layers[index]) layers[index] = [];
     layers[index++].push(root);
-    if (root.children) {
-        root.children.sort((a, b) => b.total - a.total);
-        for (const child of root.children) {
-            fillLayers(child, layers, index);
-            let vOffset = 0;
-            root.right = root.children.map(c => {
-                let wrapper = {vOffset, piece: c};
-                vOffset += c.total / root.total;
-                return wrapper;
-            });
-            child.left = [{vOffset: 0, piece: root}];
-        }
+    if (!root.children) return;
+
+    root.children.sort((a, b) => b.total - a.total);
+    for (const child of root.children) {
+        fillLayers(child, layers, index);
+        let vOffset = 0;
+        root.right = root.children.map(c => {
+            let wrapper = {vOffset, piece: c};
+            vOffset += c.total / root.total;
+            return wrapper;
+        });
+        child.left = [{vOffset: 0, piece: root}];
     }
 };
 
@@ -629,6 +639,8 @@ const switchClassifier = (type, unique, label) => {
             return (date,desc,amount) => desc.includes(unique) && label;
         case "custom":
             return (date,desc,amount) => unique(date,desc,amount) && label;
+        case "custom-return":
+            return unique;
         default:
             throw new TypeError(`Unknown rule type "${type}"`);
     };

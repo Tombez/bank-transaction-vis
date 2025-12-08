@@ -33,8 +33,10 @@
     <script src="./transaction-classifier.js" type="module"></script>
 </head>
 <body>
-    <input id="transaction-input" type="file" accept=".csv,.txt">
-    <button id="submit">Enter</button>
+    <label for="transaction-input">
+        Upload transactions:
+        <input id="transaction-input" type="file" accept=".csv,.txt" multiple>
+    </label>
     <div id="transaction-stats"></div>
     <div id="transactions">
         <h2>CSV Viewer</h2>

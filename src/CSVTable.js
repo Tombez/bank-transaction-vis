@@ -38,36 +38,43 @@ export const readCSV = text => {
 const onlyNumericWithDecimal = /^-?\d*\.?\d*$/;
 const isDate = /^(?:\d{4}([-\/\.])\d{1,2}\1\d{1,2}|\d{1,2}([-\/\.])\d{1,2}\2\d{2}(?:\d{2})?)$/;
 
-const couldBeHeaderValue = value => !value || !onlyNumericWithDecimal.test(value) &&
-    !isDate.test(value);
+const couldBeHeaderValue = value => !value ||
+    !onlyNumericWithDecimal.test(value) && !isDate.test(value);
 
 export class CSV {
-    constructor(text, hasHeaders, linesToSkip = 0) {
+    constructor(text, hasHeader, linesToSkip = 0) {
         this.rows = readCSV(text);
         if (linesToSkip) this.rows.splice(0, linesToSkip);
-        this.hasHeaders = hasHeaders === undefined ? this.detectHeaders() : hasHeaders;
-        if (this.hasHeaders) this.headers = this.rows.shift();
+        this.hasHeader = hasHeader === undefined ? this.detectHeader() :
+            hasHeader;
+        if (this.hasHeader) this.headings = this.rows.shift();
     }
-    detectHeaders() {
+    detectHeader() {
         if (!this.rows.length) return false;
 
         const firstRow = this.rows[0];
         return firstRow.every(couldBeHeaderValue);
     }
     toString() {
-        const headerText = this.hasHeaders ? this.headers.join(",") + "\n" : "";
-        return headerText + this.rows.map(row => row.join(",")).join("\n");
+        const headerText = this.hasHeader ? this.headings.join(",") + "\n" : "";
+        const escapeCsv = value => 
+            !/["\n,]/g.test(value) ?
+            `"${value.replaceAll('"', '""')}"` :
+            value;
+        return headerText + this.rows.map(row => row.map(escapeCsv).join(","))
+            .join("\n");
     }
 }
 
 export default class CSVTable extends CSV {
-    constructor(text, hasHeaders) {
-        super(text, hasHeaders);
+    constructor(text, hasHeader) {
+        super(text, hasHeader);
 
         this.table = document.createElement("table");
+        console.log(this.headings);
         let tableHTML = `<thead>
             <tr>
-            ${headers.map(h => `<th scope="col">${h}</th>`).join("\n")}
+            ${this.headings.map(h => `<th scope="col">${h}</th>`).join("\n")}
             </tr>
         </thead>
         <tbody>

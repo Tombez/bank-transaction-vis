@@ -1,15 +1,15 @@
 export default class TransactionViewer {
-    constructor(headers, transactions) {
-        this.headers = headers ?? [];
+    constructor(header, transactions) {
+        this.header = header ?? [];
         this.transactions = transactions;
 
         this.table = document.createElement("table");
         let tableHTML = `<thead>
             ${
-                headers
+                header
                 ?
                 `<tr>
-                    ${headers.map(h => `<th scope="col">${h}</th>`).join("\n")}
+                    ${header.map(h => `<th scope="col">${h}</th>`).join("\n")}
                 </tr>`
                 :
                 ""

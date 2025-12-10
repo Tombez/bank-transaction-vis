@@ -5,11 +5,11 @@ import("./rules.js").then(mod => {
 });
 import HierarchalPieGraph from "./HierarchalPieGraph.js";
 import FlowGraph from "./FlowGraph.js";
-import TransactionViewer from "./TransactionViewer.js";
 import {CSV, removeCR} from "./CSVTable.js";
 import {Color} from "./color-utils.js";
 import {dateValToMdy, dateToYmd, mdyToDate} from "./date-utils.js";
 import BarGraph from "./BarGraph.js";
+import {Bank, Account} from "./Account.js";
 Array.prototype.best = function(toScore = a => a, direction = "min") {
     const isBetter = "min" == direction ? (a, b) => a < b : (a, b) => a > b;
     let bestValue = "min" == direction ? Infinity : -Infinity;
@@ -26,6 +26,7 @@ const graphs = [];
 let textInp = document.querySelector("#transaction-input");
 let unlabeledDiv = document.querySelector("#unlabeled");
 let classifiers = [];
+let bankList = [];
 
 const updateloop = () => {
     for (const graph of graphs) {
@@ -36,36 +37,40 @@ const updateloop = () => {
 updateloop();
 
 const transactionInputChange = event => {
-    const file = event.target.files[0];
-    let reader = new FileReader();
-    reader.onload = event => {
-        const text = event.target.result;
-        const csv = new CSV(text);
-        displayCSV(csv);
-        loadTransactions(csv);
-    };
-    reader.readAsText(file);
+    for (const file of [...event.target.files]) {
+        const isBtv = /\.btv$/.test(file.name);
+        if (/^text\/(csv|plain)$/.test(file.type) || isBtv) {
+            let reader = new FileReader();
+            reader.onload = event => {
+                const text = event.target.result;
+                if (isBtv) {
+                    readBtv(text);
+                } else {
+                    const csv = new CSV(text);
+                    let bank = Bank.fromFile(file, csv, bankList);
+                    const bankListDiv = document.querySelector('#bank-list');
+                    bankListDiv.appendChild(bank.pageNode);
+                }
+            };
+            reader.readAsText(file);
+        }
+    }
+    event.target.value = "";
 };
 
 const displayCSV = (csv) => {
-    let transactions = csv.rows;
-    let headers = csv.headers;
     let transElm = document.querySelector("#transactions");
-    while (transElm.children.length > 1)
-        transElm.removeChild(transElm.childNodes[transElm.childNodes.length - 1]);
-    let tViewer = new TransactionViewer(headers, transactions);
-    transElm.appendChild(tViewer.table);
-    transElm.style.display = "block";
+    
 };
 
 const loadTransactions = (csv) => {
     let transactions = csv.rows.map(row => ({
         cols: row
     }));
-    let headers = csv.headers;
+    let header = csv.header;
     let fieldIndices = {};
-    for (let i = 0; i < headers.length; ++i) {
-        let header = headers[i];
+    for (let i = 0; i < header.length; ++i) {
+        let header = header[i];
         fieldIndices[header] = i;
     }
     const dateField = fieldIndices["Transaction Date"];
@@ -255,6 +260,10 @@ const loadTransactions = (csv) => {
     canvas.width = 1000;
     canvas.height = 800;
     let ctx = canvas.getContext("2d");
+    ctx.fontName = 'Ubuntu';
+    ctx.setFontSize = function(size, {bold} = {}) {
+        this.font = `${bold ? 'bold ' : ''}${size}px ${this.fontName}`;
+    };
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.temp = function (cb) {this.save(); cb(); this.restore()};
@@ -270,7 +279,7 @@ const loadTransactions = (csv) => {
         ctx.fillStyle = "white";
         ctx.textAlign = "right";
         ctx.textBaseline = "middle";
-        ctx.font = "bold 16px Ubuntu";
+        ctx.setFontSize(16, {bold:true});
         ctx.globalAlpha = 0.4;
         const yStep = 2000;
         ctx.beginPath();
@@ -377,16 +386,16 @@ const loadTransactions = (csv) => {
     // Draw Title:
     ctx.textBaseline = "bottom";
     ctx.fillStyle = "white";
-    ctx.font = "bold 22px Ubuntu";
+    ctx.setFontSize(22, {bold:true});
     ctx.fillText("Account Balances Over Time", canvas.width / 4, 20);
-    ctx.font = "bold 18px Ubuntu";
+    ctx.setFontSize(16, {bold:true});
     ctx.fillText(`min bal: ${minBal | 0}, max bal: ${maxBal | 0}`, canvas.width / 4, 40);
     ctx.fillText(`first transaction date: ${dateValToMdy(minStamp)}`, canvas.width / 4, 60);
     ctx.fillText(`last transaction date: ${dateValToMdy(maxStamp)}`, canvas.width / 4, 80);
 
     // Draw Graph Key:
     const keyFontSize = 16;
-    ctx.font = `bold ${keyFontSize}px Ubuntu`;
+    ctx.setFontSize(keyFontSize, {bold:true});
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
     let y = 0;

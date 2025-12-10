@@ -1,8 +1,57 @@
 <head>
+    <meta charset="UTF-8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Emoji:wght@300..700&display=swap" rel="stylesheet">
     <style>
         body {
-            background-color: #333;
-            color:aliceblue;
+            background-color: rgb(27, 27, 37);
+            color:#cad2da;
+            font: 18px Ubuntu, sans-serif;
+            margin: 0;
+        }
+        header {
+            background-color: #111113;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .page-title {
+            padding: 10px;
+            margin: 0;
+            margin-left: 50%;
+            transform: translateX(-50%);
+        }
+        .center-content {
+            display: flex;
+            justify-content: center; /* Main Axis */
+            align-items: center; /* Cross Axis */
+        }
+        .center-content-x {
+            display: flex;
+            justify-content: center; /* Main Axis */
+        }
+        .center-content-y {
+            display: flex;
+            align-items: center; /* Cross Axis */
+        }
+        .emoji {
+            font-family: "Noto Emoji", "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Android Emoji","EmojiSymbols","EmojiOne Mozilla","Twemoji Mozilla","Segoe UI Symbol","Noto Color Emoji Compat",emoji;
+            font-weight: normal;
+        }
+        .github-link {
+            justify-self: end;
+            background: #010409;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .github-link>svg {
+            fill: rgb(240, 246, 252);
+            width: 40px;
+            height: 40px;
         }
         textarea {
             width: 80%;
@@ -10,11 +59,12 @@
             overflow: scroll;
         }
         canvas {
-            margin: 4px;
+            margin-top: 8px;
+            margin-left: 8px;
         }
-        #transactions {
+        .transactions {
             display: none;
-            border: 2px solid black;
+            border: 2px solid rgb(49, 49, 53);
             width: fit-content;
             max-height: 80%;
             overflow-y: scroll;
@@ -24,23 +74,43 @@
             font-family: "Ubuntu", system-ui;
         }
         td, th {
-            border: 1px solid aliceblue;
+            border: 1px solid #cad2da;
         }
         td {
             padding-left: 3px;
+        }
+        #transaction-input {
+            margin-top: 8px;
+        }
+        #bank-list, .bank-title+div, .acc-title+div {
+            margin-left: 6px;
+        }
+        .setting {
+            margin: 6px;
+        }
+        .setting[type=checkbox] {
+            width: 21px;
+            height: 21px;
+        }
+        .settingSubmit {
+            display: block;
+            margin-top: 8px;
         }
     </style>
     <script src="./transaction-classifier.js" type="module"></script>
 </head>
 <body>
+    <header>
+        <h1 class="page-title">Transaction Visualizer</h1>
+        <a class="github-link center-content" href="https://github.com/Tombez/bank-transaction-vis" target="_top">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M12 1C5.923 1 1 5.923 1 12c0 4.867 3.149 8.979 7.521 10.436.55.096.756-.233.756-.522 0-.262-.013-1.128-.013-2.049-2.764.509-3.479-.674-3.699-1.292-.124-.317-.66-1.293-1.127-1.554-.385-.207-.936-.715-.014-.729.866-.014 1.485.797 1.691 1.128.99 1.663 2.571 1.196 3.204.907.096-.715.385-1.196.701-1.471-2.448-.275-5.005-1.224-5.005-5.432 0-1.196.426-2.186 1.128-2.956-.111-.275-.496-1.402.11-2.915 0 0 .921-.288 3.024 1.128a10.193 10.193 0 0 1 2.75-.371c.936 0 1.871.123 2.75.371 2.104-1.43 3.025-1.128 3.025-1.128.605 1.513.221 2.64.111 2.915.701.77 1.127 1.747 1.127 2.956 0 4.222-2.571 5.157-5.019 5.432.399.344.743 1.004.743 2.035 0 1.471-.014 2.654-.014 3.025 0 .289.206.632.756.522C19.851 20.979 23 16.854 23 12c0-6.077-4.922-11-11-11Z"></path>
+            </svg>
+        </a>
+    </header>
     <label for="transaction-input">
         Upload transactions:
-        <input id="transaction-input" type="file" accept=".csv,.txt" multiple>
+        <input id="transaction-input" type="file" accept=".csv,.txt,.btv" multiple />
     </label>
-    <div id="transaction-stats"></div>
-    <div id="transactions">
-        <h2>CSV Viewer</h2>
-    </div>
-    <div id="unlabeled"></div>
-    <br>
+    <div id="bank-list"></div>
 </body>

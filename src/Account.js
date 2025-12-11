@@ -1,28 +1,35 @@
 import TransactionViewer from "./TransactionViewer.js";
 
+const capitalize = s => s.at(0).toUpperCase() +
+            s.slice(1).toLowerCase();
+const sanitize$Text = text => text.replaceAll(/[^-\d\.]/g, "");
+
 class HasSetting {
     constructor() {
-        this.pageNode = document.createElement('div');
+        this.settingsNode = document.createElement('div');
         this.settings = {};
         this.inputs = {};
     }
     settingChanged(event) {}
     addSetting(type, name, settingText, events, options) {
-        const settingId = `setting-${Date.now()}-${Math.random() * 10e8 | 0}`;
+        const unique = `${Date.now() % 1e8}-${Math.random() * 1e8 | 0}`;
+        const settingId = `setting-${unique}`;
         const frag = document.createElement('div');
         const isSelect = type == 'select';
         const tagName = isSelect ? 'select' : 'input';
-        const tagEnd = isSelect ? `>${options.map((op, i) =>
-            `<option value=${i}>${op}</option>`).join()
+        const tagEnd = isSelect ? `>${
+            options.map((op, i) => `<option value=${i}>${op}</option>`).join()
         }</select>` : '/>';
         frag.innerHTML = `<label for="${settingId}">
             <${tagName} class="setting" id="${settingId}" type="${type}"${tagEnd}
             ${settingText}
         </label>`;
-        this.pageNode.appendChild(frag);
+        this.settingsNode.appendChild(frag);
         const setting = frag.querySelector('#' + settingId);
         for (const eventName in events) {
             setting.addEventListener(eventName, event => {
+                if (event.target.type == 'checkbox')
+                    event.target.value = event.target.checked;
                 events[eventName](event);
                 this.settingChanged(event);
             });
@@ -31,22 +38,53 @@ class HasSetting {
     }
 }
 
-export class Account extends HasSetting {
-    #name;
-    constructor(name) {
+class Named extends HasSetting {
+    #nameSettingName;
+    #icon;
+    constructor(name, {settingName, icon, titleType, className}) {
         super();
-        this.title = document.createElement('h3');
-        this.title.className = 'acc-title';
+        this.pageNode = document.createElement('div');
+        this.title = document.createElement(titleType);
+        this.title.className = className;
         this.pageNode.insertAdjacentElement('afterbegin', this.title);
+        this.contentNode = document.createElement('div');
+        this.contentNode.className = 'content';
+        this.contentNode.appendChild(this.settingsNode)
+        this.pageNode.appendChild(this.contentNode);
+
+        this.#nameSettingName = settingName;
+        this.#icon = icon;
+        this.addSetting('text', settingName, `What is the name of the ${settingName}?`, ({change: event => {
+            this.name = event.target.value;
+        }}));
         this.name = name;
-        this.transactionFiles = [];
     }
     get name() {
-        return this.#name;
+        return this.settings[this.#nameSettingName];
     }
     set name(name) {
-        this.#name = name;
-        this.title.innerHTML = `<span class="emoji">🧾</span> ${name}`;
+        this.settings[this.#nameSettingName] = name;
+        this.inputs[this.#nameSettingName].value = name;
+        const title = capitalize(this.#nameSettingName);
+        this.title.innerHTML = `<span class="emoji" title="${title}">${this.#icon}</span> ${name}`;
+    }
+}
+
+class Collapsable extends Named {
+    constructor() {
+
+    }
+}
+
+export class Account extends Named {
+    constructor(name) {
+        super(name, {
+            settingName: 'account',
+            icon: '🧾', 
+            titleType: 'h3',
+            className: 'acc-title',
+        });
+        this.transactionFiles = [];
     }
     addTransctionFile(tranFile) {
         this.transactionFiles.push(tranFile);
@@ -76,31 +114,22 @@ export class Account extends HasSetting {
             account = new Account(accountName);
         }
         const tranFile = new TransactionFile(file, csv, account);
-        account.addTransctionFile(tranFile);
         tranFile.settings['hasHeader'] = csv.hasHeader;
-        tranFile.settings['accountName'] = accountName;
         tranFile.settingChanged();
+        account.addTransctionFile(tranFile);
         return account;
     }
 }
 
-export class Bank extends HasSetting {
-    #name;
+export class Bank extends Named {
     constructor(name) {
-        super();
-        this.settingsDiv = document.createElement('div');
-        this.title = document.createElement('h2');
-        this.title.className = 'bank-title';
-        this.pageNode.appendChild(this.title);
-        this.name = name;
+        super(name, {
+            settingName: 'bank',
+            icon: '🏦',
+            titleType: 'h2',
+            className: 'bank-title'
+        });
         this.accounts = [];
-    }
-    set name(name) {
-        this.#name = name;
-        this.title.innerHTML = `<span class="emoji">🏦</span> ${name}`;
-    }
-    get name() {
-        return this.#name;
     }
     addAccount(account) {
         this.accounts.push(account);
@@ -114,8 +143,6 @@ export class Bank extends HasSetting {
         // Bank Name:
         const fileNameNoExt = file.name.replace(/(\.[a-z]{1,3})+$/i, '');
         const delimiterRgx = /[-_/\/\. ]/g;
-        const capitalizeFirst = s => s.at(0).toUpperCase() +
-            s.slice(1).toLowerCase();
         let bankName = fileNameNoExt;
         const findBank = () => banks.find(({name}) => name == bankName);
         let bank = findBank();
@@ -125,10 +152,11 @@ export class Bank extends HasSetting {
                     !/^transactions?$/i.test(s) &&
                     !/^\d*$/.test(s) &&
                     s
-                ).map(capitalizeFirst).join(' ');
+                ).map(capitalize).join(' ');
             findBank()
             if (!bank) {
                 bank = new Bank(bankName);
+                banks.push(bank);
             }
         }
         bank.addAccount(Account.fromFile(file, csv, bank));
@@ -142,11 +170,16 @@ const colSearches = [
     [/^(net )?amount|debits?$/i, 'debit'],
     [/^(net )?amount|credits?$/i, 'credit'],
 ];
-export class TransactionFile extends HasSetting {
+export class TransactionFile extends Named {
     constructor(file, csv, account) {
-        super();
-        this.name = file.name;
+        super(file.name, {
+            settingName: 'file',
+            icon: '📄',
+            titleType: 'h4',
+            className: 'file-title'
+        });
         this.csv = csv;
+        this.isFullyFilled = false;
         this.addSetting('checkbox', 'hasHeader', 'Does this file have column names in the first row?', {change: event => {
             const checked = event.target.checked;
             if (checked && !csv.hasHeader) {
@@ -158,9 +191,6 @@ export class TransactionFile extends HasSetting {
             }
             this.settings['hasHeader'] = checked;
         }});
-        this.addSetting('text', 'accountName', 'What is the name of the account for these transactions?', ({change: event => {
-            this.settings['accountName'] = account.name = event.target.value;
-        }}));
 
         // Add Column Settings
         const colOptions = csv.headings || csv.rows[0];
@@ -172,17 +202,17 @@ export class TransactionFile extends HasSetting {
 
         let cdIndSetting;
         this.addSetting('checkbox', 'hasCdIndicator', 'Is there a credit/debit indicator column?', {change: event => {
-            cdIndSetting.style.display = event.target.value ? 'block' : 'none';
-            this.settings['hasCdIndicator'] = event.target.value;
+            cdIndSetting.style.display = event.target.checked ? 'block' : 'none';
+            this.settings['hasCdIndicator'] = event.target.checked;
         }});
         cdIndSetting = this.addSetting('select', 'cdIndicator', 'Which is the credit/debit indicator column?', {change: event => {
             this.settings['cdIndicator'] = cdIndicatorIndex;
         }}, colOptions);
         cdIndSetting.parentNode.style.display = 'none';
 
-        this.settingChanged();
+        this.settingChanged(null, true);
     }
-    settingChanged(event) {
+    settingChanged(event, isFirstRun) {
         const updateInputs = () => {
             // Update Inputs:
             for (const settingName in this.inputs) {
@@ -194,10 +224,10 @@ export class TransactionFile extends HasSetting {
 
         // Append Viewer
         const oldViewer = this.pageNode.querySelector('table');
-        if (oldViewer) this.pageNode.removeChild(oldViewer);
+        if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
         const header = this.csv.hasHeader && this.csv.headings;
         let tViewer = new TransactionViewer(header, this.csv.rows);
-        this.pageNode.appendChild(tViewer.table);
+        this.contentNode.appendChild(tViewer.table);
 
 
         // Header need to exist here onwards
@@ -210,22 +240,49 @@ export class TransactionFile extends HasSetting {
         for (const [regex, name] of colSearches) {
             let colIndex = this.csv.headings.findIndex(colName =>
                 regex.test(colName));
+            
             this.settings[name] = colIndex;
         }
 
-        // Check for credit/debit indicator
-        if (!event || event.target != this.inputs['hasCdIndicator']) {
+        if (!event || event != this.inputs['hasCdIndicator']) {
+            // Check for credit/debit indicator
             this.settings['cdIndicator'] = this.csv.headings.findIndex(colName =>
                 /^(credit debit )?indicator$/i.test(colName));
             if (this.settings['cdIndicator'] > -1) {
                 this.settings['hasCdIndicator'] = true;
             }
         }
-        
         updateInputs();
-    }
-    getSimplifiedCsv() {
 
+        this.isFullyFilled = colSearches.every(
+            ([,name]) => this.settings[name] > -1);
+        if (isFirstRun && this.isFullyFilled) {
+            this.contentNode.hidden = true;
+        }
+    }
+    getSimplifiedCsv(accountName) {
+        const simpleCsv = this.csv.makeReorder([-1, this.settings['date'], -1, this.settings['description'], -1]);
+        simpleCsv.headings = `Account,Transaction Date,Posted Date,Description,Amount`.split(',');
+        
+        const amtCol = simpleCsv.headings.indexOf('Amount');
+        const indCol = this.settings['cdIndicator'];
+        for (let y = 0; y < simpleCsv.rows.length; ++y) {
+            const row = simpleCsv.rows[y];
+            const oldRow = this.csv.rows[y];
+            let debit = oldRow[this.settings['debit']];
+            const credit = oldRow[this.settings['credit']];
+            const isDebit = this.settings['hasCdIndicator'] > -1 &&
+                /debit/i.test(row[indCol]) || debit.startsWith('-');
+            if (isDebit && !debit.startsWith('-'))
+                debit = '-' + debit;
+            row[amtCol] = sanitize$Text(isDebit ? debit : credit);
+        }
+
+        for (const row of simpleCsv.rows) {
+            const accCol = simpleCsv.headings.indexOf('account');
+            row[accCol] = accountName;
+        }
+        return simpleCsv;
     }
     static toString() {
         const fileName = file.name.replace(/(\.[a-z]{1,3})+$/i, '');

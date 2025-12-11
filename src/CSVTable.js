@@ -42,7 +42,7 @@ const couldBeHeaderValue = value => !value ||
     !onlyNumericWithDecimal.test(value) && !isDate.test(value);
 
 export class CSV {
-    constructor(text, hasHeader, linesToSkip = 0) {
+    constructor(text = "", hasHeader, linesToSkip = 0) {
         this.rows = readCSV(text);
         if (linesToSkip) this.rows.splice(0, linesToSkip);
         this.hasHeader = hasHeader === undefined ? this.detectHeader() :
@@ -55,15 +55,35 @@ export class CSV {
         const firstRow = this.rows[0];
         return firstRow.every(couldBeHeaderValue);
     }
+    makeReorder(columns) {
+        let csv = new CSV();
+        if (this.hasHeader) this.rows.push(this.headings);
+        for (let y = 0; y < this.rows.length; ++y) {
+            const row = this.rows[y];
+            const newRow = new Array(columns.length).fill('');
+            for (let x = 0; x < columns.length; ++x) {
+                const col = columns[x];
+                if (col != -1) newRow[x] = row[col];
+            }
+            csv.rows.push(newRow);
+        }
+        if (this.hasHeader) {
+            csv.headings = csv.rows.pop();
+            csv.hasHeader = true;
+        }
+        return csv;
+    }
     toString() {
         const headerText = this.hasHeader ? this.headings.join(",") + "\n" : "";
-        const escapeCsv = value => 
-            !/["\n,]/g.test(value) ?
-            `"${value.replaceAll('"', '""')}"` :
-            value;
-        return headerText + this.rows.map(row => row.map(escapeCsv).join(","))
+        return headerText + this.rows.map(
+            row => row.map(CSV.escapeCsv).join(","))
             .join("\n");
     }
+    static escapeValue(value) {
+        return !/["\n,]/g.test(value) ?
+            `"${value.replaceAll('"', '""')}"` :
+            value;
+    };
 }
 
 export default class CSVTable extends CSV {

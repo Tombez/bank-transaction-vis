@@ -50,6 +50,20 @@ const transactionInputChange = event => {
                     let bank = Bank.fromFile(file, csv, bankList);
                     const bankListDiv = document.querySelector('#bank-list');
                     bankListDiv.appendChild(bank.pageNode);
+
+                    let simpleCsv;
+                    for (const bank of bankList) {
+                        for (const account of bank.accounts) {
+                            for (const tranFile of account.transactionFiles) {
+                                if (!tranFile.isFullyFilled) continue;
+                                const cur = tranFile.getSimplifiedCsv(account.name);
+                                console.log(cur);
+                                if (!simpleCsv) simpleCsv = cur;
+                                else simpleCsv.append(cur);
+                            }
+                        }
+                    }
+                    if (simpleCsv) loadTransactions(simpleCsv);
                 }
             };
             reader.readAsText(file);
@@ -58,20 +72,15 @@ const transactionInputChange = event => {
     event.target.value = "";
 };
 
-const displayCSV = (csv) => {
-    let transElm = document.querySelector("#transactions");
-    
-};
-
 const loadTransactions = (csv) => {
     let transactions = csv.rows.map(row => ({
         cols: row
     }));
-    let header = csv.header;
+    let headings = csv.headings;
     let fieldIndices = {};
-    for (let i = 0; i < header.length; ++i) {
-        let header = header[i];
-        fieldIndices[header] = i;
+    for (let i = 0; i < headings.length; ++i) {
+        let colName = headings[i];
+        fieldIndices[colName] = i;
     }
     const dateField = fieldIndices["Transaction Date"];
     const descField = fieldIndices["Description"];
@@ -183,10 +192,12 @@ const loadTransactions = (csv) => {
         let uniqueDescs = [...new Set(filtered.map(t => t.desc))].length;
         let unlabeled = filtered.filter(t => !t.labels[0]).length;
         let statsElm = document.querySelector("#transaction-stats");
-        statsElm.innerText = `${transactions.length} total transactions.\n`;
-        statsElm.innerText += `Showing ${filtered.length} transactions.\n`;
-        statsElm.innerText += `${uniqueDescs} unique descriptions.\n`;
-        statsElm.innerText += `${unlabeled} transactions without label.`;
+        if (statsElm) {
+            statsElm.innerText = `${transactions.length} total transactions.\n`;
+            statsElm.innerText += `Showing ${filtered.length} transactions.\n`;
+            statsElm.innerText += `${uniqueDescs} unique descriptions.\n`;
+            statsElm.innerText += `${unlabeled} transactions without label.`;
+        }
     };
     periodSelect.addEventListener("change", changePeriod);
     duplicatesBox.addEventListener("change", changePeriod);
@@ -315,9 +326,9 @@ const loadTransactions = (csv) => {
         ctx.globalAlpha = 1;
 
         // Generate Colors:
-        let colors = new Array(accounts.size).fill(0).map(_ => Color());
+        let colors = Array.from({length: accounts.size}, () => new Color());
         let count = 0;
-        for (let step = 0.1; count < 20; step *= 0.6, count++) {
+        for (let step = 0.1; count < 20 && colors.length > 1; step *= 0.6, count++) {
             let pairs = [];
             for (let i = 0; i < colors.length; ++i) {
                 const color = colors[i];
@@ -334,7 +345,7 @@ const loadTransactions = (csv) => {
             const moveFromExtremes = a => {
                 const margin = 0.20;
                 if (a.length() < margin) a.normalize().scale(0.25);
-                const fromWhite = a.diff(Color(1, 1, 1));
+                const fromWhite = a.diff(new Color(1, 1, 1));
                 const distWhite = fromWhite.length();
                 if (distWhite < margin)
                     a.add(fromWhite.normalize().scale(margin - distWhite));
@@ -475,9 +486,6 @@ const decodeGraph = array => {
 const labelTransactions = transactions => {
     let categories = new Map();
 
-    // Remove unlabeled:
-    unlabeledDiv.innerHTML = "";
-
     // Match longer and therefore more specific rules first:
     classifiers.sort((a,b) => b.unique.length - a.unique.length);
 
@@ -495,8 +503,8 @@ const labelTransactions = transactions => {
         if (!category) {
             let elm = document.createElement("pre");
             elm.textContent = transaction.cols.join(",");
-            unlabeledDiv.appendChild(elm);
-            unlabeledDiv.style.display = "block";
+            // unlabeledDiv.appendChild(elm);
+            // unlabeledDiv.style.display = "block";
         }
 
         let curCategory = categories;

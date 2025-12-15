@@ -38,6 +38,8 @@ class HasSetting {
     }
 }
 
+const collapseIconSrc = '../assets/arrows-collapse.svg';
+const expandIconSrc = '../assets/arrows-expand.svg';
 class Named extends HasSetting {
     #nameSettingName;
     #icon;
@@ -46,11 +48,26 @@ class Named extends HasSetting {
         this.pageNode = document.createElement('div');
         this.title = document.createElement(titleType);
         this.title.className = className;
-        this.pageNode.insertAdjacentElement('afterbegin', this.title);
         this.contentNode = document.createElement('div');
         this.contentNode.className = 'content';
         this.contentNode.appendChild(this.settingsNode)
         this.pageNode.appendChild(this.contentNode);
+        this.header = document.createElement('div');
+        this.header.className = 'header';
+        this.header.appendChild(this.title);
+        const collapseBtn = document.createElement('img');
+        collapseBtn.src = collapseIconSrc;
+        this.header.appendChild(collapseBtn);
+        collapseBtn.addEventListener('click', event => {
+            if (this.contentNode.hidden) {
+                this.contentNode.hidden = false;
+                collapseBtn.src = collapseIconSrc;
+            } else {
+                this.contentNode.hidden = true;
+                collapseBtn.src = expandIconSrc;
+            }
+        });
+        this.pageNode.insertAdjacentElement('afterbegin', this.header);
 
         this.#nameSettingName = settingName;
         this.#icon = icon;
@@ -88,7 +105,7 @@ export class Account extends Named {
     }
     addTransctionFile(tranFile) {
         this.transactionFiles.push(tranFile);
-        this.pageNode.appendChild(tranFile.pageNode);
+        this.contentNode.appendChild(tranFile.pageNode);
     }
     toString() {
         return JSON.stringify({name: this.name,
@@ -133,7 +150,7 @@ export class Bank extends Named {
     }
     addAccount(account) {
         this.accounts.push(account);
-        this.pageNode.appendChild(account.pageNode);
+        this.contentNode.appendChild(account.pageNode);
     }
     toString() {
         return JSON.stringify({name: this.name,

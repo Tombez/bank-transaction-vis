@@ -82,11 +82,33 @@
         #transaction-input {
             margin-top: 8px;
         }
-        .bank-title~*, .acc-title~*, .file-title~* {
+        .header {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            padding: 8px 4px 4px 4px;
+        }
+        .header>img {
+            width: 20px;
+            height: 20px;
+            margin-left: 25px;
+            fill: rgb(240, 246, 252);
+            background: rgb(14, 14, 15);
+            border-radius: 25%;
+            padding: 3px;
+            box-shadow: 3px 2px 2px black;
+            user-select: none;
+            transform: translate(-2px, -2px);
+        }
+        .header>img:hover {
+            box-shadow: none;
+            transform: none;
+        }
+        .content {
             margin-left: 6px;
         }
         .bank-title, .acc-title, .file-title {
-            margin-bottom: 4px;
+            margin: 0;
         }
         .setting {
             margin: 6px;
@@ -97,6 +119,11 @@
         }
         .hiddenAnimated {
             height: 0px;
+        }
+        #bank-list {
+            border-top: 1px solid rgb(77, 80, 82);
+            border-bottom: 1px solid rgb(77, 80, 82);
+            width: 800px;
         }
     </style>
     <script src="./transaction-classifier.js" type="module"></script>

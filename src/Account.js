@@ -1,4 +1,5 @@
 import TransactionViewer from "./TransactionViewer.js";
+import {fromDateString, dateToMdy} from "./date-utils.js";
 
 const capitalize = s => s.at(0).toUpperCase() +
             s.slice(1).toLowerCase();
@@ -31,6 +32,7 @@ class HasSetting {
                 if (event.target.type == 'checkbox')
                     event.target.value = event.target.checked;
                 events[eventName](event);
+                console.debug('assigned settting', eventName);
                 this.settingChanged(event);
             });
         }
@@ -38,8 +40,7 @@ class HasSetting {
     }
 }
 
-const collapseIconSrc = '../assets/arrows-collapse.svg';
-const expandIconSrc = '../assets/arrows-expand.svg';
+
 class Named extends HasSetting {
     #nameSettingName;
     #icon;
@@ -55,17 +56,23 @@ class Named extends HasSetting {
         this.header = document.createElement('div');
         this.header.className = 'header';
         this.header.appendChild(this.title);
-        const collapseBtn = document.createElement('img');
-        collapseBtn.src = collapseIconSrc;
+        const collapseBtn = document.createElement('div');
+        collapseBtn.className = 'icon icon-collapse';
         this.header.appendChild(collapseBtn);
         collapseBtn.addEventListener('click', event => {
             if (this.contentNode.hidden) {
                 this.contentNode.hidden = false;
-                collapseBtn.src = collapseIconSrc;
+                collapseBtn.className = 'icon icon-collapse';
             } else {
                 this.contentNode.hidden = true;
-                collapseBtn.src = expandIconSrc;
+                collapseBtn.className = 'icon icon-expand';
             }
+        });
+        const deleteBtn = document.createElement('div');
+        deleteBtn.className = 'icon icon-delete';
+        this.header.appendChild(deleteBtn);
+        deleteBtn.addEventListener('click', event => {
+            this.delete();
         });
         this.pageNode.insertAdjacentElement('afterbegin', this.header);
 
@@ -83,7 +90,12 @@ class Named extends HasSetting {
         this.settings[this.#nameSettingName] = name;
         this.inputs[this.#nameSettingName].value = name;
         const title = capitalize(this.#nameSettingName);
-        this.title.innerHTML = `<span class="emoji" title="${title}">${this.#icon}</span> ${name}`;
+        this.title.innerHTML = `<span class="emoji" title="${title}">${this.#icon}</span>${name}`;
+    }
+    delete() {
+        if (this.pageNode.parentNode) {
+            this.pageNode.parentNode.removeChild(this.pageNode);
+        }
     }
 }
 
@@ -106,6 +118,18 @@ export class Account extends Named {
     addTransctionFile(tranFile) {
         this.transactionFiles.push(tranFile);
         this.contentNode.appendChild(tranFile.pageNode);
+    }
+    removeTransactionFile(tranFile) {
+        const index = this.transactionFiles.indexOf(tranFile);
+        if (index > -1) {
+            this.transactionFiles.splice(index, 1);
+        }
+    }
+    delete() {
+        super.delete();
+        if (this.bank) {
+            this.bank.removeAccount(this);
+        }
     }
     toString() {
         return JSON.stringify({name: this.name,
@@ -134,6 +158,7 @@ export class Account extends Named {
         tranFile.settings['hasHeader'] = csv.hasHeader;
         tranFile.settingChanged();
         account.addTransctionFile(tranFile);
+        account.bank = bank;
         return account;
     }
 }
@@ -151,6 +176,21 @@ export class Bank extends Named {
     addAccount(account) {
         this.accounts.push(account);
         this.contentNode.appendChild(account.pageNode);
+    }
+    removeAccount(account) {
+        const index = this.accounts.indexOf(account);
+        if (index > -1) {
+            this.accounts.splice(index, 1);
+        }
+    }
+    delete() {
+        super.delete();
+        if (this.bankList) {
+            const index = this.bankList.indexOf(this);
+            if (index > -1) {
+                this.bankList.splice(index, 1);
+            }
+        }
     }
     toString() {
         return JSON.stringify({name: this.name,
@@ -170,13 +210,14 @@ export class Bank extends Named {
                     !/^\d*$/.test(s) &&
                     s
                 ).map(capitalize).join(' ');
-            findBank()
+            bank = findBank()
             if (!bank) {
                 bank = new Bank(bankName);
                 banks.push(bank);
             }
         }
         bank.addAccount(Account.fromFile(file, csv, bank));
+        bank.bankList = banks;
         return bank;
     }
 }
@@ -219,11 +260,11 @@ export class TransactionFile extends Named {
 
         let cdIndSetting;
         this.addSetting('checkbox', 'hasCdIndicator', 'Is there a credit/debit indicator column?', {change: event => {
-            cdIndSetting.style.display = event.target.checked ? 'block' : 'none';
+            cdIndSetting.parentNode.style.display = event.target.checked ? 'block' : 'none';
             this.settings['hasCdIndicator'] = event.target.checked;
         }});
         cdIndSetting = this.addSetting('select', 'cdIndicator', 'Which is the credit/debit indicator column?', {change: event => {
-            this.settings['cdIndicator'] = cdIndicatorIndex;
+            this.settings['cdIndicator'] = event.target.value;
         }}, colOptions);
         cdIndSetting.parentNode.style.display = 'none';
 
@@ -232,10 +273,14 @@ export class TransactionFile extends Named {
     settingChanged(event, isFirstRun) {
         const updateInputs = () => {
             // Update Inputs:
+            console.debug('updating inputs');
             for (const settingName in this.inputs) {
                 this.inputs[settingName].value = this.settings[settingName];
                 if (this.inputs[settingName].type == 'checkbox')
                     this.inputs[settingName].checked = this.settings[settingName];
+            }
+            if (this.settings['hasCdIndicator']) {
+                this.inputs['cdIndicator'].parentNode.style.display = 'block';
             }
         };
 
@@ -248,25 +293,32 @@ export class TransactionFile extends Named {
 
 
         // Header need to exist here onwards
+        updateInputs();
         if (!this.csv.hasHeader) {
-            updateInputs();
             return;
         }
 
         // Column Identification
         for (const [regex, name] of colSearches) {
+            if (this.settings[name] > -1)
+                continue;
+            console.debug('col ident', name, this.settings[name]);
             let colIndex = this.csv.headings.findIndex(colName =>
                 regex.test(colName));
             
             this.settings[name] = colIndex;
         }
 
-        if (!event || event != this.inputs['hasCdIndicator']) {
+        if (!event || event.target != this.inputs['hasCdIndicator'] &&
+            parseInt(this.settings['cdIndicator']) == -1
+        ) {
             // Check for credit/debit indicator
-            this.settings['cdIndicator'] = this.csv.headings.findIndex(colName =>
+            const cdIndicator = this.csv.headings.findIndex(colName =>
                 /^(credit debit )?indicator$/i.test(colName));
-            if (this.settings['cdIndicator'] > -1) {
+            if (cdIndicator > -1) {
                 this.settings['hasCdIndicator'] = true;
+                this.settings['cdIndicator'] = cdIndicator;
+
             }
         }
         updateInputs();
@@ -296,10 +348,19 @@ export class TransactionFile extends Named {
         }
 
         for (const row of simpleCsv.rows) {
-            const accCol = simpleCsv.headings.indexOf('account');
+            const accCol = simpleCsv.headings.indexOf('Account');
             row[accCol] = accountName;
+
+            const dateCol = simpleCsv.headings.indexOf('Transaction Date');
+            row[dateCol] = dateToMdy(fromDateString(row[dateCol]));
         }
         return simpleCsv;
+    }
+    delete() {
+        super.delete();
+        if (this.account) {
+            this.account.removeTransactionFile(this);
+        }
     }
     static toString() {
         const fileName = file.name.replace(/(\.[a-z]{1,3})+$/i, '');

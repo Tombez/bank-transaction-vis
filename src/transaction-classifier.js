@@ -40,6 +40,7 @@ const transactionInputChange = event => {
     for (const file of [...event.target.files]) {
         const isBtv = /\.btv$/.test(file.name);
         if (/^text\/(csv|plain)$/.test(file.type) || isBtv) {
+            file.arrayBuffer = file.arrayBuffer();
             let reader = new FileReader();
             reader.onload = event => {
                 const text = event.target.result;
@@ -51,19 +52,7 @@ const transactionInputChange = event => {
                     const bankListDiv = document.querySelector('#bank-list');
                     bankListDiv.appendChild(bank.pageNode);
 
-                    let simpleCsv;
-                    for (const bank of bankList) {
-                        for (const account of bank.accounts) {
-                            for (const tranFile of account.transactionFiles) {
-                                if (!tranFile.isFullyFilled) continue;
-                                const cur = tranFile.getSimplifiedCsv(account.name);
-                                console.log(cur);
-                                if (!simpleCsv) simpleCsv = cur;
-                                else simpleCsv.append(cur);
-                            }
-                        }
-                    }
-                    if (simpleCsv) loadTransactions(simpleCsv);
+                    compileTransactions();
                 }
             };
             reader.readAsText(file);
@@ -72,6 +61,21 @@ const transactionInputChange = event => {
     event.target.value = "";
 };
 
+const compileTransactions = () => {
+    let simpleCsv;
+    for (const bank of bankList) {
+        for (const account of bank.accounts) {
+            for (const tranFile of account.transactionFiles) {
+                if (!tranFile.isFullyFilled) continue;
+                const cur = tranFile.getSimplifiedCsv(account.name);
+                console.log(cur);
+                if (!simpleCsv) simpleCsv = cur;
+                else simpleCsv.append(cur);
+            }
+        }
+    }
+    if (simpleCsv) loadTransactions(simpleCsv);
+};
 const loadTransactions = (csv) => {
     let transactions = csv.rows.map(row => ({
         cols: row
@@ -134,9 +138,9 @@ const loadTransactions = (csv) => {
         document.body.appendChild(interestGraph.container);
         console.log(interestCSV);
     };
-    addGraphForCategory('Interest', 'Quarterly Interest Earned');
-    addGraphForCategory('Food', 'Quarterly Food Spending', true);
-    addGraphForCategory('Fuel', 'Quarterly Fuel Spending', true);
+    // addGraphForCategory('Interest', 'Quarterly Interest Earned');
+    // addGraphForCategory('Food', 'Quarterly Food Spending', true);
+    // addGraphForCategory('Fuel', 'Quarterly Fuel Spending', true);
     
     // Make options:
     let options = "";
@@ -375,13 +379,15 @@ const loadTransactions = (csv) => {
                 dataPoints.push({x, y});
             }
 
-            ctx.beginPath();
-            ctx.moveTo(dataPoints[0].x * canvas.width, dataPoints[0].y * canvas.height);
-            for (let i = 1; i < dataPoints.length; ++i) {
-                const point = dataPoints[i];
-                ctx.lineTo(point.x * canvas.width, point.y * canvas.height);
+            if (dataPoints.length) {
+                ctx.beginPath();
+                ctx.moveTo(dataPoints[0].x * canvas.width, dataPoints[0].y * canvas.height);
+                for (let i = 1; i < dataPoints.length; ++i) {
+                    const point = dataPoints[i];
+                    ctx.lineTo(point.x * canvas.width, point.y * canvas.height);
+                }
+                ctx.stroke();
             }
-            ctx.stroke();
         }
 
         // Y baseline:

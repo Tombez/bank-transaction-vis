@@ -14,6 +14,13 @@ export const mdyToDate = (mdy, sep = "/") => {
     let [m,d,y] = mdy.split(sep);
     return new Date(y,m-1,d);
 };
+export const isYmd = str => /^\d{4}/.test(str);
+export const fromDateString = (dateStr) => {
+    const separator = dateStr.match(/[^\d]/);
+    let [m,d,y] = dateStr.split(separator);
+    if (isYmd(dateStr)) [m, d, y] = [d, y, m];
+    return new Date(y,m-1,d);
+};
 export const fromYmdToMdy = (text, sep = "/") => {
     const separator = text.match(/[^\d]/);
     const [y, m, d] = text.split(separator);

@@ -68,10 +68,14 @@ export class CSV {
             csv.rows.push(newRow);
         }
         if (this.hasHeader) {
+            this.rows.pop();
             csv.headings = csv.rows.pop();
             csv.hasHeader = true;
         }
         return csv;
+    }
+    append(csv) {
+        this.rows = this.rows.concat(csv.rows);
     }
     toString() {
         const headerText = this.hasHeader ? this.headings.join(",") + "\n" : "";

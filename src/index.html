@@ -39,6 +39,8 @@
         .emoji {
             font-family: "Noto Emoji", "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Android Emoji","EmojiSymbols","EmojiOne Mozilla","Twemoji Mozilla","Segoe UI Symbol","Noto Color Emoji Compat",emoji;
             font-weight: normal;
+            user-select: none;
+            margin-right: 10px;
         }
         .github-link {
             justify-self: end;
@@ -82,30 +84,51 @@
         #transaction-input {
             margin-top: 8px;
         }
+        div:has(>.header) {
+            box-shadow: 0 0 5px black;
+            margin-top: 5px;
+        }
         .header {
             display: flex;
             flex-direction: row;
             align-items: center;
             padding: 8px 4px 4px 4px;
         }
-        .header>img {
+        .header>.icon {
             width: 20px;
             height: 20px;
             margin-left: 25px;
             fill: rgb(240, 246, 252);
-            background: rgb(14, 14, 15);
+            background-color: rgb(14, 14, 15);
             border-radius: 25%;
-            padding: 3px;
-            box-shadow: 3px 2px 2px black;
+            box-shadow: 0 0 4px black;
             user-select: none;
-            transform: translate(-2px, -2px);
+            cursor: pointer;
+            background-size: 100%;
+            background-repeat: no-repeat;
+            background-origin: border-box;
+            border: 1px solid transparent;
+            padding: 1px;
         }
-        .header>img:hover {
-            box-shadow: none;
-            transform: none;
+        .icon:hover {
+            box-shadow: 0 0 2px black;
+            background-origin: padding-box;
+        }
+        .icon:active {
+            box-shadow: 0 0 2px black inset;
+            background-origin: content-box;
+        }
+        .icon-collapse {
+            background-image: url("/assets/arrows-collapse.svg");
+        }
+        .icon-expand {
+            background-image: url("/assets/arrows-expand.svg");
+        }
+        .icon-delete  {
+            background-image: url("/assets/trash-bin.svg");
         }
         .content {
-            margin-left: 6px;
+            margin-left: 10px;
         }
         .bank-title, .acc-title, .file-title {
             margin: 0;
@@ -121,8 +144,7 @@
             height: 0px;
         }
         #bank-list {
-            border-top: 1px solid rgb(77, 80, 82);
-            border-bottom: 1px solid rgb(77, 80, 82);
+            margin-left: 8px;
             width: 800px;
         }
     </style>

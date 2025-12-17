@@ -1,12 +1,15 @@
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Emoji:wght@300..700&display=swap" rel="stylesheet">
     <style>
         body {
-            background-color: rgb(27, 27, 37);
-            color:#cad2da;
+            --main-bg-color: rgb(27, 27, 37);
+            --main-color: #cad2da;
+            background-color: var(--main-bg-color);
+            color: var(--main-color);
             font: 18px Ubuntu, sans-serif;
             margin: 0;
         }
@@ -63,6 +66,7 @@
         canvas {
             margin-top: 8px;
             margin-left: 8px;
+            max-width: 96%;
         }
         .transactions {
             display: none;
@@ -72,16 +76,36 @@
             overflow-y: scroll;
         }
         table {
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             font-family: "Ubuntu", system-ui;
         }
-        td, th {
-            border: 1px solid #cad2da;
+        table th {
+            border-top: 1px solid var(--main-color);
+            border-right: 1px solid var(--main-color);
+            border-bottom: 1px solid var(--main-color);
         }
-        td {
+        table td {
+            border-right: 1px solid var(--main-color);
+            border-bottom: 1px solid var(--main-color);
+        }
+            table th:first-child,
+            table td:first-child {
+            border-left: 1px solid var(--main-color);
+        }
+        td, th {
             padding-left: 3px;
         }
-        #transaction-input {
+        .table-content-wrapper {
+            overflow-y: auto; max-height: 75%;
+        }
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: rgb(14, 14, 16);
+        }
+        #transaction-input, #period {
             margin-top: 8px;
         }
         div:has(>.header) {
@@ -94,7 +118,10 @@
             align-items: center;
             padding: 8px 4px 4px 4px;
         }
-        .header>.icon {
+        .btn-wrapper {
+            display: flex;
+        }
+        .icon {
             width: 20px;
             height: 20px;
             margin-left: 25px;
@@ -132,6 +159,7 @@
         }
         .bank-title, .acc-title, .file-title {
             margin: 0;
+            max-width: 80%;
         }
         .setting {
             margin: 6px;
@@ -145,7 +173,37 @@
         }
         #bank-list {
             margin-left: 8px;
-            width: 800px;
+            max-width: 800px;
+        }
+        @media only screen and (max-width: 600px) {
+            body {
+                /* font-size: 16px; */
+            }
+            header {
+                font-size: 3.5vw;
+            }
+            .header {
+                justify-content: space-between;
+            }
+            .page-title {
+                margin-left: 4px;
+                transform: none;
+            }
+            .content {
+                margin-left: 1%;
+                margin-right: 1%;
+            }
+            .icon {
+                margin-left: 8px;
+            }
+            canvas, #bank-list {
+                width: 100%;
+                max-width: 100%;
+                margin-left: 0;
+            }
+            input[type="text"], select {
+                display: block;
+            }
         }
     </style>
     <script src="./transaction-classifier.js" type="module"></script>

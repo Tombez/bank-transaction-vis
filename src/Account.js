@@ -1,12 +1,14 @@
 import TransactionViewer from "./TransactionViewer.js";
 import {fromDateString, dateToMdy} from "./date-utils.js";
+import memoMixin from "./memoMixin.js";
 
 const capitalize = s => s.at(0).toUpperCase() +
-            s.slice(1).toLowerCase();
+    s.slice(1).toLowerCase();
 const sanitize$Text = text => text.replaceAll(/[^-\d\.]/g, "");
 
-class HasSetting {
+const HasSetting = memoMixin(Base => class extends Base {
     constructor() {
+        super();
         this.settingsNode = document.createElement('div');
         this.settings = {};
         this.inputs = {};
@@ -32,16 +34,14 @@ class HasSetting {
                 if (event.target.type == 'checkbox')
                     event.target.value = event.target.checked;
                 events[eventName](event);
-                console.debug('assigned settting', eventName);
                 this.settingChanged(event);
             });
         }
         return this.inputs[name] = setting;
     }
-}
+});
 
-
-class Named extends HasSetting {
+const NamedMixin = memoMixin(Base => class extends Base {
     #nameSettingName;
     #icon;
     constructor(name, {settingName, icon, titleType, className}) {
@@ -55,25 +55,10 @@ class Named extends HasSetting {
         this.pageNode.appendChild(this.contentNode);
         this.header = document.createElement('div');
         this.header.className = 'header';
+        this.btnWrapper = document.createElement('div');
+        this.btnWrapper.className = 'btn-wrapper';
         this.header.appendChild(this.title);
-        const collapseBtn = document.createElement('div');
-        collapseBtn.className = 'icon icon-collapse';
-        this.header.appendChild(collapseBtn);
-        collapseBtn.addEventListener('click', event => {
-            if (this.contentNode.hidden) {
-                this.contentNode.hidden = false;
-                collapseBtn.className = 'icon icon-collapse';
-            } else {
-                this.contentNode.hidden = true;
-                collapseBtn.className = 'icon icon-expand';
-            }
-        });
-        const deleteBtn = document.createElement('div');
-        deleteBtn.className = 'icon icon-delete';
-        this.header.appendChild(deleteBtn);
-        deleteBtn.addEventListener('click', event => {
-            this.delete();
-        });
+        this.header.appendChild(this.btnWrapper);
         this.pageNode.insertAdjacentElement('afterbegin', this.header);
 
         this.#nameSettingName = settingName;
@@ -92,18 +77,46 @@ class Named extends HasSetting {
         const title = capitalize(this.#nameSettingName);
         this.title.innerHTML = `<span class="emoji" title="${title}">${this.#icon}</span>${name}`;
     }
+});
+
+const Collapsable = memoMixin(Base => class extends Base {
+    constructor(...args) {
+        super(...args);
+        const collapseBtn = document.createElement('div');
+        collapseBtn.className = 'icon icon-collapse';
+        this.btnWrapper.appendChild(collapseBtn);
+        collapseBtn.addEventListener('click', event => {
+            if (this.contentNode.hidden) {
+                this.contentNode.hidden = false;
+                collapseBtn.className = 'icon icon-collapse';
+            } else {
+                this.contentNode.hidden = true;
+                collapseBtn.className = 'icon icon-expand';
+            }
+        });
+    }
+});
+
+const Deletable = memoMixin(Base => class extends Base {
+    constructor(...args) {
+        super(...args);
+        const deleteBtn = document.createElement('div');
+        deleteBtn.className = 'icon icon-delete';
+        this.btnWrapper.appendChild(deleteBtn);
+        deleteBtn.addEventListener('click', event => {
+            this.delete();
+        });
+    }
     delete() {
+        const event = new CustomEvent('delete', {bubbles: true});
+        this.pageNode.dispatchEvent(event);
         if (this.pageNode.parentNode) {
             this.pageNode.parentNode.removeChild(this.pageNode);
         }
     }
-}
+});
 
-class Collapsable extends Named {
-    constructor() {
-
-    }
-}
+const Named = Deletable(Collapsable(NamedMixin(HasSetting())));
 
 export class Account extends Named {
     constructor(name) {
@@ -118,17 +131,14 @@ export class Account extends Named {
     addTransctionFile(tranFile) {
         this.transactionFiles.push(tranFile);
         this.contentNode.appendChild(tranFile.pageNode);
+        tranFile.pageNode.addEventListener('delete', event => {
+            this.removeTransactionFile(tranFile);
+        });
     }
     removeTransactionFile(tranFile) {
         const index = this.transactionFiles.indexOf(tranFile);
         if (index > -1) {
             this.transactionFiles.splice(index, 1);
-        }
-    }
-    delete() {
-        super.delete();
-        if (this.bank) {
-            this.bank.removeAccount(this);
         }
     }
     toString() {
@@ -176,6 +186,9 @@ export class Bank extends Named {
     addAccount(account) {
         this.accounts.push(account);
         this.contentNode.appendChild(account.pageNode);
+        account.pageNode.addEventListener('delete', event => {
+            this.removeAccount(account);
+        });
     }
     removeAccount(account) {
         const index = this.accounts.indexOf(account);
@@ -183,18 +196,9 @@ export class Bank extends Named {
             this.accounts.splice(index, 1);
         }
     }
-    delete() {
-        super.delete();
-        if (this.bankList) {
-            const index = this.bankList.indexOf(this);
-            if (index > -1) {
-                this.bankList.splice(index, 1);
-            }
-        }
-    }
     toString() {
         return JSON.stringify({name: this.name,
-            transactionFiles: transactionFiles.map(String)});
+            transactionFiles: this.transactionFiles.map(String)});
     }
     static fromFile(file, csv, banks) {
         // Bank Name:
@@ -223,7 +227,7 @@ export class Bank extends Named {
 }
 
 const colSearches = [
-    [/^(transaction |trade )?date$/i, 'date'],
+    [/^((transaction|trade|post(ed|ing)|effective) )?date$/i, 'date'],
     [/^(transaction )?description$/i, 'description'],
     [/^(net )?amount|debits?$/i, 'debit'],
     [/^(net )?amount|credits?$/i, 'credit'],
@@ -273,7 +277,6 @@ export class TransactionFile extends Named {
     settingChanged(event, isFirstRun) {
         const updateInputs = () => {
             // Update Inputs:
-            console.debug('updating inputs');
             for (const settingName in this.inputs) {
                 this.inputs[settingName].value = this.settings[settingName];
                 if (this.inputs[settingName].type == 'checkbox')
@@ -289,7 +292,7 @@ export class TransactionFile extends Named {
         if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
         const header = this.csv.hasHeader && this.csv.headings;
         let tViewer = new TransactionViewer(header, this.csv.rows);
-        this.contentNode.appendChild(tViewer.table);
+        this.contentNode.appendChild(tViewer.pageNode);
 
 
         // Header need to exist here onwards
@@ -302,7 +305,6 @@ export class TransactionFile extends Named {
         for (const [regex, name] of colSearches) {
             if (this.settings[name] > -1)
                 continue;
-            console.debug('col ident', name, this.settings[name]);
             let colIndex = this.csv.headings.findIndex(colName =>
                 regex.test(colName));
             
@@ -326,7 +328,7 @@ export class TransactionFile extends Named {
         this.isFullyFilled = colSearches.every(
             ([,name]) => this.settings[name] > -1);
         if (isFirstRun && this.isFullyFilled) {
-            this.contentNode.hidden = true;
+            this.pageNode.querySelector('.icon-collapse').click();
         }
     }
     getSimplifiedCsv(accountName) {
@@ -340,8 +342,9 @@ export class TransactionFile extends Named {
             const oldRow = this.csv.rows[y];
             let debit = oldRow[this.settings['debit']];
             const credit = oldRow[this.settings['credit']];
-            const isDebit = this.settings['hasCdIndicator'] > -1 &&
-                /debit/i.test(row[indCol]) || debit.startsWith('-');
+            if (!debit) debugger;
+            const isDebit = this.settings['hasCdIndicator'] && indCol > -1 &&
+                /debit/i.test(oldRow[indCol]) || debit.startsWith('-');
             if (isDebit && !debit.startsWith('-'))
                 debit = '-' + debit;
             row[amtCol] = sanitize$Text(isDebit ? debit : credit);
@@ -355,12 +358,6 @@ export class TransactionFile extends Named {
             row[dateCol] = dateToMdy(fromDateString(row[dateCol]));
         }
         return simpleCsv;
-    }
-    delete() {
-        super.delete();
-        if (this.account) {
-            this.account.removeTransactionFile(this);
-        }
     }
     static toString() {
         const fileName = file.name.replace(/(\.[a-z]{1,3})+$/i, '');

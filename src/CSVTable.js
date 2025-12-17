@@ -60,11 +60,8 @@ export class CSV {
         if (this.hasHeader) this.rows.push(this.headings);
         for (let y = 0; y < this.rows.length; ++y) {
             const row = this.rows[y];
-            const newRow = new Array(columns.length).fill('');
-            for (let x = 0; x < columns.length; ++x) {
-                const col = columns[x];
-                if (col != -1) newRow[x] = row[col];
-            }
+            if (!row.length) continue;
+            const newRow = columns.map((col, i) => col == -1 ? '' : row[col]);
             csv.rows.push(newRow);
         }
         if (this.hasHeader) {

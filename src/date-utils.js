@@ -14,6 +14,7 @@ export const mdyToDate = (mdy, sep = "/") => {
     let [m,d,y] = mdy.split(sep);
     return new Date(y,m-1,d);
 };
+export const isDateStr = s => /\d{4}([^\d])\d\d?\1\d\d?|\d\d?([^\d])\d\d?\2\d{4}/.test(s);
 export const isYmd = str => /^\d{4}/.test(str);
 export const fromDateString = (dateStr) => {
     const separator = dateStr.match(/[^\d]/);

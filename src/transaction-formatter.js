@@ -239,7 +239,7 @@ for (const fileName of csvFileNames) {
 
 const simpleReplacements = [
     /POS Debit - Visa Check Card \d{4} - /g, // debit from card number
-    /^(TST|UEP|CKE| SQ)(?: |\*) ?/g, // card reader branding
+    /^(TST|UEP|CKE| ?SQ) ?\*? ?/g, // card reader branding
     "ACH Transaction - ",
     "PLUS DEBIT ",
     "Payment to ",

@@ -27,7 +27,7 @@ export default class BarGraph {
         this.constructHTML();
         this.canvas.width = _width;
         this.canvas.height = _height;
-        this.font = '"Helvetica Neue", Helvetica, Arial, sans-serif';
+        this.font = '"Helvetica Neue", Helvetica, sans-serif';
         this.ctx = this.canvas.getContext('2d');
         this.dataUpdate();
         this.canvas.addEventListener('mousemove', this.mousemove.bind(this));

@@ -7,10 +7,11 @@ import HierarchalPieGraph from "./HierarchalPieGraph.js";
 import FlowGraph from "./FlowGraph.js";
 import {CSV, removeCR} from "./CSVTable.js";
 import {Color} from "./color-utils.js";
-import {dateValToMdy, dateToYmd, mdyToDate} from "./date-utils.js";
+import {dateValToMdy, dateToYmd, mdyToDate, isDateStr} from "./date-utils.js";
 import BarGraph from "./BarGraph.js";
 import {Bank, Account} from "./Account.js";
 Array.prototype.best = function(toScore = a => a, direction = "min") {
+    if (!this.length) return null;
     const isBetter = "min" == direction ? (a, b) => a < b : (a, b) => a > b;
     let bestValue = "min" == direction ? Infinity : -Infinity;
     return this.reduce((best, cur) => {
@@ -30,11 +31,18 @@ let bankList = [];
 
 const updateloop = () => {
     for (const graph of graphs) {
-        graph.update();
+        if (graph.update) graph.update();
     }
     requestAnimationFrame(updateloop);
 };
 updateloop();
+
+const removeGraphs = () => {
+    for (let cur; cur = graphs.pop();) {
+        cur = cur.container || cur.canvas || cur;
+        document.body.removeChild(cur);
+    }
+};
 
 const transactionInputChange = event => {
     for (const file of [...event.target.files]) {
@@ -47,12 +55,7 @@ const transactionInputChange = event => {
                 if (isBtv) {
                     readBtv(text);
                 } else {
-                    const csv = new CSV(text);
-                    let bank = Bank.fromFile(file, csv, bankList);
-                    const bankListDiv = document.querySelector('#bank-list');
-                    bankListDiv.appendChild(bank.pageNode);
-
-                    compileTransactions();
+                    loadCsvFile(file, text);
                 }
             };
             reader.readAsText(file);
@@ -61,6 +64,20 @@ const transactionInputChange = event => {
     event.target.value = "";
 };
 
+const loadCsvFile = (file, text) => {
+    const csv = new CSV(text);
+    let bank = Bank.fromFile(file, csv, bankList);
+    const bankListDiv = document.querySelector('#bank-list');
+    bankListDiv.appendChild(bank.pageNode);
+    bank.pageNode.addEventListener('delete', event => {
+        const index = bankList.findIndex(bank => bank.pageNode === event.target);
+        if (index > -1) {
+            bankList.splice(index, 1);
+        }
+    });
+
+    compileTransactions();
+}
 const compileTransactions = () => {
     let simpleCsv;
     for (const bank of bankList) {
@@ -68,13 +85,17 @@ const compileTransactions = () => {
             for (const tranFile of account.transactionFiles) {
                 if (!tranFile.isFullyFilled) continue;
                 const cur = tranFile.getSimplifiedCsv(account.name);
-                console.log(cur);
+                console.debug(cur);
                 if (!simpleCsv) simpleCsv = cur;
                 else simpleCsv.append(cur);
             }
         }
     }
-    if (simpleCsv) loadTransactions(simpleCsv);
+    if (simpleCsv) {
+        removeGraphs();
+        loadTransactions(simpleCsv);
+    }
+
 };
 const loadTransactions = (csv) => {
     let transactions = csv.rows.map(row => ({
@@ -98,7 +119,7 @@ const loadTransactions = (csv) => {
 
     for (const t of transactions) {
         let [m,d,y] = t.date.split("/");
-        if (!/\d\d?\/\d\d?\/\d{4}/.test(t.date))
+        if (!isDateStr(t.date))
             console.error("invalid date: ", t.date);
         t.timestamp = +new Date(y,m-1,d);
         t.year = +y;
@@ -115,7 +136,6 @@ const loadTransactions = (csv) => {
         transactions.filter(t =>
             (!year || t.year == year) && (!(q+1) || t.quarter == q));
 
-    // Make Quarterly Interest Graph:
     const addGraphForCategory = (category, title = category, invert = false) => {
         labelTransactions(transactions);
         let year = minDateT.year, quarter = minDateT.quarter;
@@ -136,12 +156,78 @@ const loadTransactions = (csv) => {
         }
         let interestGraph = new BarGraph(title, interestData, interestLabels, canvasSize.x, 500);
         document.body.appendChild(interestGraph.container);
-        console.log(interestCSV);
+        console.debug(interestCSV);
     };
     // addGraphForCategory('Interest', 'Quarterly Interest Earned');
     // addGraphForCategory('Food', 'Quarterly Food Spending', true);
     // addGraphForCategory('Fuel', 'Quarterly Fuel Spending', true);
     
+    // makeOptions();
+
+
+    let accounts = calculateDailyBalances(transactions);
+
+    const accountValues = Array.from(accounts.values());
+    
+    const stampRange = {
+        min: accountValues.best(({stampRange: {min}}) => min).stampRange.min,
+        max: accountValues.best(({stampRange: {max}}) => max, "max").stampRange.max
+    };
+    stampRange.diff = stampRange.max - stampRange.min;
+    
+    const balRange = {
+        min: accountValues.best(({balRange: {min}}) => min).balRange.min,
+        max: accountValues.best(({balRange: {max}}) => max, "max").balRange.max
+    };
+    balRange.diff = balRange.max - balRange.min;
+    
+    makeBalancesGraph(transactions, accounts, stampRange, balRange);
+
+    // Make Net Worth Graph:
+    {
+        const totalDailyBalance = [];
+        for (let d = stampRange.min, i = 0; d < stampRange.max; d += Date.msDay, ++i) {
+            let total = 0;
+            for (const account of accounts.values()) {
+                if (account.stampRange.min <= d) {
+                    let index = Math.round((d - account.stampRange.min) / Date.msDay);
+                    if (d > account.stampRange.max)
+                        index = account.dailyBalance.length - 1;
+                    total += account.dailyBalance[index];
+                }
+            }
+            totalDailyBalance[i] = total;
+        }
+
+        let dataPoints = [];
+        const labels = [];
+        let prevYear = -Infinity;
+        for (let i = 0, len = totalDailyBalance.length; i < len; ++i) {
+            const bal = totalDailyBalance[i];
+            const stamp = stampRange.min + i * Date.msDay;
+            const date = new Date(stamp);
+            const year = +date.getFullYear();
+            let label = "";
+            const isFirstOrLast = prevYear == -Infinity || i + 1 == len;
+            if (year > prevYear || isFirstOrLast) {
+                prevYear = year;
+                label = isFirstOrLast ? dateToYmd(date) : date.getFullYear();
+            }
+            labels.push(label);
+
+            const x = (stamp - stampRange.min) / stampRange.diff;
+            const y = (bal - balRange.min) / balRange.diff;
+            dataPoints.push({x, y});
+        }
+
+        let netWorthGraph = new BarGraph("Net Worth Over Time", totalDailyBalance, labels, canvasSize.x, 400);
+        console.debug("net worth graph", netWorthGraph);
+        window.netWorthGraph = netWorthGraph;
+        graphs.push(netWorthGraph);
+        document.body.appendChild(netWorthGraph.container);
+    }
+};
+const makeOptions = () => {
     // Make options:
     let options = "";
     const addOption = (value, text) =>
@@ -171,8 +257,7 @@ const loadTransactions = (csv) => {
     const periodSelect = document.querySelector("#period");
     const changePeriod = () => {
         const periodValue = periodSelect.value;
-        while (graphs.length)
-            document.body.removeChild(graphs.pop().canvas);
+        removeGraphs();
 
         let [year, quar] = periodValue.split(",").map(s => +s);
         let title = periodSelect.selectedOptions[0].text;
@@ -206,11 +291,9 @@ const loadTransactions = (csv) => {
     periodSelect.addEventListener("change", changePeriod);
     duplicatesBox.addEventListener("change", changePeriod);
 
-    // Remove examples:
-    while (graphs.length) document.body.removeChild(graphs.pop().canvas);
-
     changePeriod();
-
+};
+const calculateDailyBalances = (transactions) => {
     // Account Balances:
     let nonSweepTrans = transactions.filter(t => !t.desc.includes("Sweep") || t.desc == "Cash Sweep Interest");
     nonSweepTrans = nonSweepTrans.filter(t => !t.desc.match(/(Buy|Sell) [A-Z]{3,4}/));
@@ -234,48 +317,38 @@ const loadTransactions = (csv) => {
         let {dailyChange} = account;
         const stamps = Array.from(dailyChange.keys());
         const dailyChangeEntries = Array.from(dailyChange.entries());
-        const minStamp = stamps.best();
-        const maxStamp = stamps.best(a => a, "max");
+        const stamp = account.stampRange =
+            {min: stamps.best(), max: stamps.best(a => a, "max")};
         let dailyBalance = account.dailyBalance = [];
         Date.msDay = 1000 * 60 * 60 * 24;
         let i = 0;
         let prevBal = 0;
         dailyChangeEntries.sort(([stampA], [stampB]) => stampA - stampB);
-        console.log(accountName, account);
-        console.log(accountName, "transactions:", accounts.get(accountName).transactions);
-        for (const [stamp, change] of dailyChangeEntries) {
-            let stampI = Math.round((stamp - minStamp) / Date.msDay);
+        console.debug(accountName, account);
+        console.debug(accountName, "transactions:", accounts.get(accountName).transactions);
+        for (const [curStamp, change] of dailyChangeEntries) {
+            let stampI = Math.round((curStamp - stamp.min) / Date.msDay);
             for (; i < stampI; ++i) dailyBalance[i] = prevBal;
             dailyBalance[stampI] = prevBal += change;
         }
-        let minBal = dailyBalance.best();
-        let maxBal = dailyBalance.best(a => a, "max");
-        if (!accountName.includes("Credit") && minBal < 0) {
+        const balRange = account.balRange =
+            {min: dailyBalance.best(), max: dailyBalance.best(a => a, "max")};
+        if (!accountName.includes("Credit") && balRange.min < 0) {
             for (let i = 0; i < dailyBalance.length; ++i)
-                dailyBalance[i] -= minBal;
-            maxBal -= minBal;
-            minBal -= minBal;
+                dailyBalance[i] -= balRange.min;
+            balRange.max -= balRange.min;
+            balRange.min -= balRange.min;
         }
-        account.minStamp = minStamp;
-        account.maxStamp = maxStamp;
-        account.minBal = minBal;
-        account.maxBal = maxBal;
     }
-
-    const accountValues = Array.from(accounts.values());
-    const minStamp = accountValues.best(({minStamp}) => minStamp).minStamp;
-    const maxStamp = accountValues.best(({maxStamp}) => maxStamp, "max").maxStamp;
-    const stampDiff = maxStamp - minStamp;
-    const minBal = accountValues.best(({minBal}) => minBal).minBal;
-    const maxBal = accountValues.best(({maxBal}) => maxBal, "max").maxBal;
-    const balDiff = maxBal - minBal;
-    
+    return accounts;
+};
+const makeBalancesGraph = (transactions, accounts, stampRange, balRange) => {
     // Drawing setup
     let canvas = document.createElement("canvas");
-    canvas.width = 1000;
-    canvas.height = 800;
+    canvas.width = 800;
+    canvas.height = 600;
     let ctx = canvas.getContext("2d");
-    ctx.fontName = 'Ubuntu';
+    ctx.fontName = '"Helvetica Neue", Helvetica, sans-serif';
     ctx.setFontSize = function(size, {bold} = {}) {
         this.font = `${bold ? 'bold ' : ''}${size}px ${this.fontName}`;
     };
@@ -298,8 +371,8 @@ const loadTransactions = (csv) => {
         ctx.globalAlpha = 0.4;
         const yStep = 2000;
         ctx.beginPath();
-        for (let y = Math.floor(minBal / yStep) * yStep; y < maxBal; y += yStep) {
-            const drawY = (y - minBal) / balDiff * canvas.height;
+        for (let y = Math.floor(balRange.min / yStep) * yStep; y < balRange.max; y += yStep) {
+            const drawY = (y - balRange.min) / balRange.diff * canvas.height;
             ctx.moveTo(0, drawY);
             ctx.lineTo(canvas.width, drawY);
             ctx.temp(() => {
@@ -312,11 +385,11 @@ const loadTransactions = (csv) => {
         // Draw Y Axes:
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        const minYear = new Date(minStamp).getFullYear();
-        const maxYear = new Date(maxStamp).getFullYear();
+        const minYear = new Date(stampRange.min).getFullYear();
+        const maxYear = new Date(stampRange.max).getFullYear();
         for (let year = minYear; year <= maxYear; ++year) {
             const x = +new Date(year, 0, 1);
-            const drawX = (x - minStamp) / stampDiff * canvas.width;
+            const drawX = (x - stampRange.min) / stampRange.diff * canvas.width;
             ctx.moveTo(drawX, 0);
             ctx.lineTo(drawX, canvas.height);
             ctx.temp(() => {
@@ -364,7 +437,8 @@ const loadTransactions = (csv) => {
         }
         
         // Draw Data lines:
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
         for (const [accountName, account] of accounts.entries()) {
             const {dailyBalance} = account;
             
@@ -373,9 +447,9 @@ const loadTransactions = (csv) => {
             let dataPoints = [];
             for (let i = 0, len = dailyBalance.length; i < len; ++i) {
                 const bal = dailyBalance[i];
-                const stamp = account.minStamp + i * Date.msDay;
-                const x = (stamp - minStamp) / stampDiff;
-                const y = (bal - minBal) / balDiff;
+                const stamp = account.stampRange.min + i * Date.msDay;
+                const x = (stamp - stampRange.min) / stampRange.diff;
+                const y = (bal - balRange.min) / balRange.diff;
                 dataPoints.push({x, y});
             }
 
@@ -394,24 +468,26 @@ const loadTransactions = (csv) => {
         ctx.beginPath();
         ctx.lineWidth = 1;
         ctx.strokeStyle = "white";
-        const y0 = (0 - minBal) / balDiff;
+        const y0 = (0 - balRange.min) / balRange.diff;
         ctx.moveTo(0, y0 * canvas.height);
         ctx.lineTo(1 * canvas.width, y0 * canvas.height);
         ctx.stroke();
     });
 
     // Draw Title:
-    ctx.textBaseline = "bottom";
+    ctx.textBaseline = "baseline";
     ctx.fillStyle = "white";
-    ctx.setFontSize(22, {bold:true});
+    ctx.globalAlpha = 0.8;
+    ctx.setFontSize(26, {bold:true});
     ctx.fillText("Account Balances Over Time", canvas.width / 4, 20);
-    ctx.setFontSize(16, {bold:true});
-    ctx.fillText(`min bal: ${minBal | 0}, max bal: ${maxBal | 0}`, canvas.width / 4, 40);
-    ctx.fillText(`first transaction date: ${dateValToMdy(minStamp)}`, canvas.width / 4, 60);
-    ctx.fillText(`last transaction date: ${dateValToMdy(maxStamp)}`, canvas.width / 4, 80);
+    ctx.setFontSize(22, {bold:true});
+    ctx.fillText(`min bal: ${balRange.min | 0}, max bal: ${balRange.max | 0}`, canvas.width / 4, 40);
+    ctx.fillText(`first transaction date: ${dateValToMdy(stampRange.min)}`, canvas.width / 4, 60);
+    ctx.fillText(`last transaction date: ${dateValToMdy(stampRange.max)}`, canvas.width / 4, 80);
+    ctx.globalAlpha = 1;
 
     // Draw Graph Key:
-    const keyFontSize = 16;
+    const keyFontSize = 22;
     ctx.setFontSize(keyFontSize, {bold:true});
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
@@ -423,50 +499,8 @@ const loadTransactions = (csv) => {
         ctx.fillRect(canvas.width - 20, y - 7, 10, 10);
     }
 
+    graphs.push(canvas);
     document.body.appendChild(canvas);
-
-
-    // Make Total Account Balance Graph:
-    {
-        const totalDailyBalance = [];
-        for (let d = minStamp, i = 0; d < maxStamp; d += Date.msDay, ++i) {
-            let total = 0;
-            for (const account of accounts.values()) {
-                if (account.minStamp <= d) {
-                    let index = Math.round((d - account.minStamp) / Date.msDay);
-                    if (d > account.maxStamp)
-                        index = account.dailyBalance.length - 1;
-                    total += account.dailyBalance[index];
-                }
-            }
-            totalDailyBalance[i] = total;
-        }
-
-        let dataPoints = [];
-        const labels = [];
-        let prevYear = -Infinity;
-        for (let i = 0, len = totalDailyBalance.length; i < len; ++i) {
-            const bal = totalDailyBalance[i];
-            const stamp = minStamp + i * Date.msDay;
-            const date = new Date(stamp);
-            const year = +date.getFullYear();
-            let label = "";
-            const isFirstOrLast = prevYear == -Infinity || i + 1 == len;
-            if (year > prevYear || isFirstOrLast) {
-                prevYear = year;
-                label = isFirstOrLast ? dateToYmd(date) : date.getFullYear();
-            }
-            labels.push(label);
-            const x = (stamp - minStamp) / stampDiff;
-            const y = (bal - minBal) / balDiff;
-            dataPoints.push({x, y});
-        }
-
-        let netWorthGraph = new BarGraph("Net Worth Over Time", totalDailyBalance, labels, canvasSize.x, 400);
-        console.log("net worth graph", netWorthGraph);
-        window.netWorthGraph = netWorthGraph;
-        document.body.appendChild(netWorthGraph.container);
-    }
 };
 
 const encodeGraph = root => {
@@ -526,10 +560,10 @@ const labelTransactions = transactions => {
 
     const ignored = categories.get("Ignored");
     categories.delete("Ignored");
-    console.log("ignored:", ignored);
+    console.debug("ignored:", ignored);
     const income = categories.get("Income");
     categories.delete("Income");
-    console.log("income:", income);
+    console.debug("income:", income);
 
     const consolidate = (map) => { // recursive
         if (!map) return [];
@@ -558,16 +592,16 @@ const labelTransactions = transactions => {
     let root = consolidate(new Map([["root", categories]]))[0];
     let incomeRoot = consolidate(new Map([["Income", income]]))[0];
     let ignoredRoot = consolidate(new Map([["Ignored", ignored]]))[0];
-    // console.log(JSON.stringify(encodeGraph(root)));
-    // console.log("total:", root.total);
-    console.log("no matching transactions:", classifiers.filter(c => !c.transactions));
+    // console.debug(JSON.stringify(encodeGraph(root)));
+    // console.debug("total:", root.total);
+    console.debug("no matching transactions:", classifiers.filter(c => !c.transactions));
     return {root, income: incomeRoot, ignored: ignoredRoot};
 };
 
 const makeHPieGraph = (root, title) => {
     let graph = new HierarchalPieGraph(root, title, canvasSize);
     graphs.push(graph);
-    console.log(title + " root:", graph.root);
+    console.debug(title + " root:", graph.root);
     document.body.appendChild(graph.canvas);
     return graph;
 };
@@ -588,7 +622,7 @@ const makeFlowGraph = ({root, income}, title) => {
     root.name = "Spending";
     root.color = "#900";
     fillLayers(root, layers, layers.length);
-    console.log("Flow layers", layers);
+    console.debug("Flow layers", layers);
 
     const deficit = income.total - root.total;
     if (deficit > 0) {

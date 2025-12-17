@@ -9,7 +9,7 @@ import {CSV, removeCR} from "./CSVTable.js";
 import {Color} from "./color-utils.js";
 import {dateValToMdy, dateToYmd, mdyToDate, isDateStr} from "./date-utils.js";
 import BarGraph from "./BarGraph.js";
-import {Bank, Account} from "./Account.js";
+import {Bank, Account, TransactionFile} from "./Account.js";
 Array.prototype.best = function(toScore = a => a, direction = "min") {
     if (!this.length) return null;
     const isBetter = "min" == direction ? (a, b) => a < b : (a, b) => a > b;
@@ -66,17 +66,45 @@ const transactionInputChange = event => {
 
 const loadCsvFile = (file, text) => {
     const csv = new CSV(text);
-    let bank = Bank.fromFile(file, csv, bankList);
+    let tranFile = new TransactionFile(file, csv);
+
+    let accountName = Account.searchTranFileForAccountName(tranFile) || 'Default Account';
+    let account;
+    let bank = bankList.find(
+        bank => account = bank.accounts.find(a => a.name == accountName));
+    if (!account) {
+        // todo: identify account based on csv header
+    }
+    if (!account) { // create new account
+        account = new Account(accountName);
+        if (!bank) {
+            bank = Bank.findFromFile(tranFile, bankList);
+            if (!(bank instanceof Bank)) {
+                bank = createNewBank(bank);
+            }
+        }
+        bank.addAccount(account);
+    }
+    account.addTransactionFile(tranFile);
+
+    compileTransactions();
+}
+const createNewBank = (bankName) => {
+    // Create new bank
+    let bank = new Bank(bankName);
+    bankList.push(bank);
     const bankListDiv = document.querySelector('#bank-list');
     bankListDiv.appendChild(bank.pageNode);
     bank.pageNode.addEventListener('delete', event => {
-        const index = bankList.findIndex(bank => bank.pageNode === event.target);
+        const index = bankList.findIndex(
+            bank => bank.pageNode === event.target);
         if (index > -1) {
             bankList.splice(index, 1);
         }
+        compileTransactions();
     });
-
-    compileTransactions();
+    bank.pageNode.addEventListener('change', compileTransactions);
+    return bank;
 }
 const compileTransactions = () => {
     let simpleCsv;

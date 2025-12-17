@@ -76,6 +76,8 @@ const NamedMixin = memoMixin(Base => class extends Base {
         this.inputs[this.#nameSettingName].value = name;
         const title = capitalize(this.#nameSettingName);
         this.title.innerHTML = `<span class="emoji" title="${title}">${this.#icon}</span>${name}`;
+        const event = new CustomEvent('rename', {detail: this, bubbles: true});
+        this.pageNode.dispatchEvent(event);
     }
 });
 
@@ -127,19 +129,34 @@ export class Account extends Named {
             className: 'acc-title',
         });
         this.transactionFiles = [];
+        makeDroppable(this.pageNode, tranFile =>
+                tranFile instanceof TransactionFile && tranFile.account != this,
+            tranFile => {
+                tranFile.account.removeTransactionFile(tranFile);
+                this.addTransactionFile(tranFile);
+                const event = new CustomEvent('change', {bubbles:true});
+                this.pageNode.dispatchEvent(event);
+            });
+        makeDraggable(this.pageNode, this, this.title);
     }
-    addTransctionFile(tranFile) {
+    addTransactionFile(tranFile) {
         this.transactionFiles.push(tranFile);
         this.contentNode.appendChild(tranFile.pageNode);
         tranFile.pageNode.addEventListener('delete', event => {
             this.removeTransactionFile(tranFile);
         });
+        tranFile.account = this;
     }
     removeTransactionFile(tranFile) {
         const index = this.transactionFiles.indexOf(tranFile);
         if (index > -1) {
             this.transactionFiles.splice(index, 1);
         }
+        tranFile.account = null;
+    }
+    absorb(account) {
+        for (let file; file = account.transactionFiles.pop();)
+            this.addTransactionFile(file);
     }
     toString() {
         return JSON.stringify({name: this.name,
@@ -149,8 +166,8 @@ export class Account extends Named {
     static fromString(str) {
         const obj = JSON.parse(str);
     }
-    static fromFile(file, csv, bank) {
-        // Look for account name
+    static searchTranFileForAccountName(tranFile) {
+        const csv = tranFile.csv;
         let accountName = "";
         if (csv.hasHeader) {
             const accColIndex = csv.headings.findIndex(colName =>
@@ -160,16 +177,7 @@ export class Account extends Named {
                 accountName = csv.rows[0][accColIndex];
             }
         }
-        let account = bank.accounts.find(a => a.name == accountName);
-        if (!account) {
-            account = new Account(accountName);
-        }
-        const tranFile = new TransactionFile(file, csv, account);
-        tranFile.settings['hasHeader'] = csv.hasHeader;
-        tranFile.settingChanged();
-        account.addTransctionFile(tranFile);
-        account.bank = bank;
-        return account;
+        return accountName;
     }
 }
 
@@ -182,6 +190,30 @@ export class Bank extends Named {
             className: 'bank-title'
         });
         this.accounts = [];
+
+        // combine accounts with the same name
+        this.contentNode.addEventListener('rename', event => {
+            const target = event.detail;
+            if (!(target instanceof Account)) return;
+            const accountA = target;
+            const indexA = this.accounts.indexOf(accountA);
+            const accountB = this.accounts.find(
+                b => b.name == accountA.name && b !== accountA);
+            if (accountB) { // duplicate name found
+                accountB.absorb(accountA);
+                accountA.delete();
+            }
+        });
+
+        makeDroppable(this.pageNode, data => {
+                return data instanceof Account && data.bank !== this;
+            },
+            account => {
+                account.bank.removeAccount(account);
+                this.addAccount(account);
+                const event = new CustomEvent('change', {bubbles:true});
+                this.pageNode.dispatchEvent(event);
+            });
     }
     addAccount(account) {
         this.accounts.push(account);
@@ -189,48 +221,77 @@ export class Bank extends Named {
         account.pageNode.addEventListener('delete', event => {
             this.removeAccount(account);
         });
+        account.bank = this;
     }
     removeAccount(account) {
         const index = this.accounts.indexOf(account);
         if (index > -1) {
-            this.accounts.splice(index, 1);
+            this.accounts[index] = this.accounts.pop();
         }
+        account.bank = null;
     }
     toString() {
         return JSON.stringify({name: this.name,
             transactionFiles: this.transactionFiles.map(String)});
     }
-    static fromFile(file, csv, banks) {
+    static findFromFile(file, bankList) {
         // Bank Name:
         const fileNameNoExt = file.name.replace(/(\.[a-z]{1,3})+$/i, '');
-        const delimiterRgx = /[-_/\/\. ]/g;
         let bankName = fileNameNoExt;
-        const findBank = () => banks.find(({name}) => name == bankName);
+        const findBank = () => bankList.find(({name}) => name == bankName);
         let bank = findBank();
-        if (!bank) {
-            bankName = fileNameNoExt.split(delimiterRgx)
-                .filter(s =>
-                    !/^transactions?$/i.test(s) &&
-                    !/^\d*$/.test(s) &&
-                    s
-                ).map(capitalize).join(' ');
-            bank = findBank()
-            if (!bank) {
-                bank = new Bank(bankName);
-                banks.push(bank);
-            }
-        }
-        bank.addAccount(Account.fromFile(file, csv, bank));
-        bank.bankList = banks;
-        return bank;
+        if (bank) return bank;
+        
+        const delimiterRgx = /[-_/\/\. ]/g;
+        const capitalize = s => s.at(0).toUpperCase() +
+            s.slice(1).toLowerCase();
+        bankName = fileNameNoExt.split(delimiterRgx)
+            .filter(s =>
+                !/^transactions?$/i.test(s) &&
+                !/^\d*$/.test(s) &&
+                s
+            ).map(capitalize).join(' ') || 'Default Bank';
+        bank = findBank();
+        return bank || bankName;
     }
+}
+
+let drug;
+const makeDraggable = (node, data, handle = node) => {
+    handle.draggable = true;
+    handle.addEventListener('dragstart', event => {
+        node.classList?.add('dragging');
+        drug = data;
+        event.dataTransfer.dropEffect = 'move';
+    });
+    handle.addEventListener('dragend', event => {
+        node.classList?.remove('dragging');
+    });
+};
+const makeDroppable = (node, test, drop) => {
+    node.addEventListener('dragover', event => {
+        if (!test(drug)) return;
+        event.preventDefault();
+        node.classList.add('drag-over');
+    });
+    node.addEventListener('dragleave', event => {
+        if (!test(drug)) return;
+        event.preventDefault();
+        node.classList.remove('drag-over');
+    });
+    node.addEventListener('drop', event => {
+        if (!test(drug)) return;
+        event.preventDefault();
+        node.classList.remove('drag-over');
+        drop(drug);
+    });
 }
 
 const colSearches = [
     [/^((transaction|trade|post(ed|ing)|effective) )?date$/i, 'date'],
     [/^(transaction )?description$/i, 'description'],
-    [/^(net )?amount|debits?$/i, 'debit'],
-    [/^(net )?amount|credits?$/i, 'credit'],
+    [/^(transaction |net )?amount|debits?$/i, 'debit'],
+    [/^(transaction |net )?amount|credits?$/i, 'credit'],
 ];
 export class TransactionFile extends Named {
     constructor(file, csv, account) {
@@ -253,6 +314,7 @@ export class TransactionFile extends Named {
             }
             this.settings['hasHeader'] = checked;
         }});
+        this.settings['hasHeader'] = csv.hasHeader;
 
         // Add Column Settings
         const colOptions = csv.headings || csv.rows[0];
@@ -273,6 +335,8 @@ export class TransactionFile extends Named {
         cdIndSetting.parentNode.style.display = 'none';
 
         this.settingChanged(null, true);
+
+        makeDraggable(this.pageNode, this, this.title);
     }
     settingChanged(event, isFirstRun) {
         const updateInputs = () => {
@@ -288,7 +352,7 @@ export class TransactionFile extends Named {
         };
 
         // Append Viewer
-        const oldViewer = this.pageNode.querySelector('table');
+        const oldViewer = this.pageNode.querySelector('.table-content-wrapper');
         if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
         const header = this.csv.hasHeader && this.csv.headings;
         let tViewer = new TransactionViewer(header, this.csv.rows);
@@ -327,9 +391,12 @@ export class TransactionFile extends Named {
 
         this.isFullyFilled = colSearches.every(
             ([,name]) => this.settings[name] > -1);
-        if (isFirstRun && this.isFullyFilled) {
-            this.pageNode.querySelector('.icon-collapse').click();
-        }
+        if (this.isFullyFilled) {
+            if (isFirstRun && this.isFullyFilled) {
+                this.pageNode.querySelector('.icon-collapse').click();
+            }
+            this.header.classList.add('fully-filled');
+        } else this.header.classList.remove('fully-filled');
     }
     getSimplifiedCsv(accountName) {
         const simpleCsv = this.csv.makeReorder([-1, this.settings['date'], -1, this.settings['description'], -1]);
@@ -342,7 +409,6 @@ export class TransactionFile extends Named {
             const oldRow = this.csv.rows[y];
             let debit = oldRow[this.settings['debit']];
             const credit = oldRow[this.settings['credit']];
-            if (!debit) debugger;
             const isDebit = this.settings['hasCdIndicator'] && indCol > -1 &&
                 /debit/i.test(oldRow[indCol]) || debit.startsWith('-');
             if (isDebit && !debit.startsWith('-'))

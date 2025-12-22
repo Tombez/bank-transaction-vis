@@ -26,8 +26,26 @@ const canvasSize = {x: 800, y: 800};
 const graphs = [];
 let textInp = document.querySelector("#transaction-input");
 let unlabeledDiv = document.querySelector("#unlabeled");
+let addBankBtn = document.querySelector('#add-bank-btn');
+let exportBtn = document.querySelector('#export-btn');
 let classifiers = [];
-let bankList = [];
+let bankList = window.bankList = [];
+
+addBankBtn.addEventListener('click', () => createNewBank('Default bank'));
+exportBtn.addEventListener('click', () => {
+    const btvText = JSON.stringify(bankList.map(b => b.encode()));
+    const filename = 'transactions.btv';
+    const blob = new Blob([btvText], {
+        type: 'data:attachment/plain;charset=utf-8'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    // Append the link to the document body (necessary for Firefox).
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+});
 
 const updateloop = () => {
     for (const graph of graphs) {
@@ -64,6 +82,20 @@ const transactionInputChange = event => {
     event.target.value = "";
 };
 
+const readBtv = (text) => {
+    try {
+        const bankObjs = JSON.parse(text);
+        for (const bankObj of bankObjs) {
+            const bank = Bank.decode(bankObj);
+            addBank(bank);
+            bank.pageNode.querySelector('.icon-collapse')?.click();
+        }
+        compileTransactions();
+    } catch (error) {
+        console.error(error);
+        alert('Failed to read btv file, ' + error);
+    }
+};
 const loadCsvFile = (file, text) => {
     const csv = new CSV(text);
     let tranFile = new TransactionFile(file, csv);
@@ -80,7 +112,9 @@ const loadCsvFile = (file, text) => {
         if (!bank) {
             bank = Bank.findFromFile(tranFile, bankList);
             if (!(bank instanceof Bank)) {
-                bank = createNewBank(bank);
+                // Create new bank
+                bank = new Bank(bank);
+                addBank(bank);
             }
         }
         bank.addAccount(account);
@@ -89,9 +123,7 @@ const loadCsvFile = (file, text) => {
 
     compileTransactions();
 }
-const createNewBank = (bankName) => {
-    // Create new bank
-    let bank = new Bank(bankName);
+const addBank = (bank) => {
     bankList.push(bank);
     const bankListDiv = document.querySelector('#bank-list');
     bankListDiv.appendChild(bank.pageNode);
@@ -104,7 +136,6 @@ const createNewBank = (bankName) => {
         compileTransactions();
     });
     bank.pageNode.addEventListener('change', compileTransactions);
-    return bank;
 }
 const compileTransactions = () => {
     let simpleCsv;
@@ -113,14 +144,15 @@ const compileTransactions = () => {
             for (const tranFile of account.transactionFiles) {
                 if (!tranFile.isFullyFilled) continue;
                 const cur = tranFile.getSimplifiedCsv(account.name);
-                console.debug(cur);
+                console.debug('appending simple csv: ', cur);
                 if (!simpleCsv) simpleCsv = cur;
                 else simpleCsv.append(cur);
             }
         }
     }
-    if (simpleCsv) {
-        removeGraphs();
+    removeGraphs();
+    if (simpleCsv && simpleCsv.rows.length) {
+        console.debug('loading transactions csv: ', simpleCsv);
         loadTransactions(simpleCsv);
     }
 
@@ -503,7 +535,6 @@ const makeBalancesGraph = (transactions, accounts, stampRange, balRange) => {
     });
 
     // Draw Title:
-    ctx.textBaseline = "baseline";
     ctx.fillStyle = "white";
     ctx.globalAlpha = 0.8;
     ctx.setFontSize(26, {bold:true});

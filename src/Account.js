@@ -1,6 +1,8 @@
 import TransactionViewer from "./TransactionViewer.js";
 import {fromDateString, dateToMdy} from "./date-utils.js";
 import memoMixin from "./memoMixin.js";
+import {CSV} from './CSVTable.js';
+import {makeDraggable, makeDroppable} from './dragAndDrop.js';
 
 const capitalize = s => s.at(0).toUpperCase() +
     s.slice(1).toLowerCase();
@@ -110,17 +112,29 @@ const Deletable = memoMixin(Base => class extends Base {
         });
     }
     delete() {
-        const event = new CustomEvent('delete', {bubbles: true});
+        const event = new CustomEvent('delete', {detail: this, bubbles: true});
         this.pageNode.dispatchEvent(event);
         if (this.pageNode.parentNode) {
             this.pageNode.parentNode.removeChild(this.pageNode);
         }
     }
 });
+const Addable = memoMixin(Base => class extends Base {
+    constructor(...args) {
+        super(...args);
+        const addBtn = document.createElement('div');
+        addBtn.className = 'icon icon-add';
+        this.btnWrapper.appendChild(addBtn);
+        addBtn.addEventListener('click', event => {
+            this.add();
+        });
+    }
+    add() {}
+});
 
-const Named = Deletable(Collapsable(NamedMixin(HasSetting())));
+const Named = NamedMixin(HasSetting());
 
-export class Account extends Named {
+export class Account extends Deletable(Collapsable(Named)) {
     constructor(name) {
         super(name, {
             settingName: 'account',
@@ -137,14 +151,15 @@ export class Account extends Named {
                 const event = new CustomEvent('change', {bubbles:true});
                 this.pageNode.dispatchEvent(event);
             });
-        makeDraggable(this.pageNode, this, this.title);
+        makeDraggable(this.pageNode, this, this.header);
+        this.pageNode.addEventListener('delete', event => {
+            if (event.detail instanceof TransactionFile)
+                this.removeTransactionFile(event.detail);
+        });
     }
     addTransactionFile(tranFile) {
         this.transactionFiles.push(tranFile);
         this.contentNode.appendChild(tranFile.pageNode);
-        tranFile.pageNode.addEventListener('delete', event => {
-            this.removeTransactionFile(tranFile);
-        });
         tranFile.account = this;
     }
     removeTransactionFile(tranFile) {
@@ -158,10 +173,17 @@ export class Account extends Named {
         for (let file; file = account.transactionFiles.pop();)
             this.addTransactionFile(file);
     }
-    toString() {
-        return JSON.stringify({name: this.name,
+    encode() {
+        return {
             settings: this.settings,
-            transactionFiles: transactionFiles.map(String)});
+            transactionFiles: this.transactionFiles.map(t => t.encode())};
+    }
+    static decode(accountObj) {
+        let account = new Account(accountObj.settings['account']);
+        account.settings = accountObj.settings;
+        accountObj.transactionFiles.forEach(t =>
+            account.addTransactionFile(TransactionFile.decode(t)));
+        return account;
     }
     static fromString(str) {
         const obj = JSON.parse(str);
@@ -181,7 +203,7 @@ export class Account extends Named {
     }
 }
 
-export class Bank extends Named {
+export class Bank extends Deletable(Collapsable(Addable(Named))) {
     constructor(name) {
         super(name, {
             settingName: 'bank',
@@ -195,14 +217,7 @@ export class Bank extends Named {
         this.contentNode.addEventListener('rename', event => {
             const target = event.detail;
             if (!(target instanceof Account)) return;
-            const accountA = target;
-            const indexA = this.accounts.indexOf(accountA);
-            const accountB = this.accounts.find(
-                b => b.name == accountA.name && b !== accountA);
-            if (accountB) { // duplicate name found
-                accountB.absorb(accountA);
-                accountA.delete();
-            }
+            this.checkDuplicateAccountName(target);
         });
 
         makeDroppable(this.pageNode, data => {
@@ -214,25 +229,53 @@ export class Bank extends Named {
                 const event = new CustomEvent('change', {bubbles:true});
                 this.pageNode.dispatchEvent(event);
             });
+        this.pageNode.addEventListener('delete', event => {
+            if (event.detail instanceof Account)
+                this.removeAccount(event.detail);
+        });
     }
     addAccount(account) {
+        if (this.checkDuplicateAccountName(account)) return;
         this.accounts.push(account);
         this.contentNode.appendChild(account.pageNode);
-        account.pageNode.addEventListener('delete', event => {
-            this.removeAccount(account);
-        });
         account.bank = this;
     }
     removeAccount(account) {
         const index = this.accounts.indexOf(account);
         if (index > -1) {
-            this.accounts[index] = this.accounts.pop();
+            if (index < this.accounts.length - 1)
+                this.accounts[index] = this.accounts.pop();
+            else this.accounts.pop();
+            account.bank = null;
         }
-        account.bank = null;
     }
-    toString() {
-        return JSON.stringify({name: this.name,
-            transactionFiles: this.transactionFiles.map(String)});
+    checkDuplicateAccountName(accountA) {
+        const indexA = this.accounts.indexOf(accountA);
+        const accountB = this.accounts.find(
+            b => b.name == accountA.name && b !== accountA);
+        if (accountB) { // duplicate name found
+            accountB.absorb(accountA);
+            accountA.delete();
+        }
+        return accountB;
+    }
+    add() {
+        let name = 'Default Account';
+        for (let i = 1; this.accounts.find(a => a.name == name); ++i)
+            name = 'Default Account ' + i;
+        this.addAccount(new Account(name));
+    }
+    encode() {
+        return {
+            settings: this.settings,
+            accounts: this.accounts.map(a => a.encode())};
+    }
+    static decode(bankObj) {
+        let bank = new Bank(bankObj.settings['bank']);
+        bank.settings = bankObj.settings;
+        bankObj.accounts.forEach(a =>
+            bank.addAccount(Account.decode(a)));
+        return bank;
     }
     static findFromFile(file, bankList) {
         // Bank Name:
@@ -256,45 +299,14 @@ export class Bank extends Named {
     }
 }
 
-let drug;
-const makeDraggable = (node, data, handle = node) => {
-    handle.draggable = true;
-    handle.addEventListener('dragstart', event => {
-        node.classList?.add('dragging');
-        drug = data;
-        event.dataTransfer.dropEffect = 'move';
-    });
-    handle.addEventListener('dragend', event => {
-        node.classList?.remove('dragging');
-    });
-};
-const makeDroppable = (node, test, drop) => {
-    node.addEventListener('dragover', event => {
-        if (!test(drug)) return;
-        event.preventDefault();
-        node.classList.add('drag-over');
-    });
-    node.addEventListener('dragleave', event => {
-        if (!test(drug)) return;
-        event.preventDefault();
-        node.classList.remove('drag-over');
-    });
-    node.addEventListener('drop', event => {
-        if (!test(drug)) return;
-        event.preventDefault();
-        node.classList.remove('drag-over');
-        drop(drug);
-    });
-}
-
 const colSearches = [
     [/^((transaction|trade|post(ed|ing)|effective) )?date$/i, 'date'],
     [/^(transaction )?description$/i, 'description'],
     [/^(transaction |net )?amount|debits?$/i, 'debit'],
     [/^(transaction |net )?amount|credits?$/i, 'credit'],
 ];
-export class TransactionFile extends Named {
-    constructor(file, csv, account) {
+export class TransactionFile extends Deletable(Collapsable(Named)) {
+    constructor(file, csv) {
         super(file.name, {
             settingName: 'file',
             icon: '📄',
@@ -302,6 +314,7 @@ export class TransactionFile extends Named {
             className: 'file-title'
         });
         this.csv = csv;
+        csv.rows = csv.rows.filter(row => row.length);
         this.isFullyFilled = false;
         this.addSetting('checkbox', 'hasHeader', 'Does this file have column names in the first row?', {change: event => {
             const checked = event.target.checked;
@@ -336,7 +349,7 @@ export class TransactionFile extends Named {
 
         this.settingChanged(null, true);
 
-        makeDraggable(this.pageNode, this, this.title);
+        makeDraggable(this.pageNode, this, this.header);
     }
     settingChanged(event, isFirstRun) {
         const updateInputs = () => {
@@ -393,7 +406,8 @@ export class TransactionFile extends Named {
             ([,name]) => this.settings[name] > -1);
         if (this.isFullyFilled) {
             if (isFirstRun && this.isFullyFilled) {
-                this.pageNode.querySelector('.icon-collapse').click();
+                // if (!this.pageNode.querySelector('.icon-collapse')) debugger;
+                this.pageNode.querySelector('.icon-collapse')?.click();
             }
             this.header.classList.add('fully-filled');
         } else this.header.classList.remove('fully-filled');
@@ -401,6 +415,7 @@ export class TransactionFile extends Named {
     getSimplifiedCsv(accountName) {
         const simpleCsv = this.csv.makeReorder([-1, this.settings['date'], -1, this.settings['description'], -1]);
         simpleCsv.headings = `Account,Transaction Date,Posted Date,Description,Amount`.split(',');
+        if (!simpleCsv.rows.length) return simpleCsv;
         
         const amtCol = simpleCsv.headings.indexOf('Amount');
         const indCol = this.settings['cdIndicator'];
@@ -425,9 +440,19 @@ export class TransactionFile extends Named {
         }
         return simpleCsv;
     }
-    static toString() {
-        const fileName = file.name.replace(/(\.[a-z]{1,3})+$/i, '');
-        return JSON.stringify({fil});
+    encode() {
+        return {
+            settings: this.settings,
+            csv: this.csv.toString()
+        };
+    }
+    static decode(tranFileObj) {
+        const name = tranFileObj.settings['file'];
+        const csv = new CSV(tranFileObj.csv);
+        let tranFile = new TransactionFile({name}, csv);
+        tranFile.settings = tranFileObj.settings;
+        tranFile.settingChanged(null, true);
+        return tranFile;
     }
 }
 

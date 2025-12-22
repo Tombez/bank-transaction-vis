@@ -11,7 +11,7 @@ export const readCSV = text => {
         eol.lastIndex = i;
         if (eol.test(text)) {
             if (i > 0 && text[i - 1] == ",") row.push("");
-            rows.push(row);
+            if (row.length) rows.push(row);
             row = [];
             i = eol.lastIndex;
             if (i >= text.length) break;
@@ -53,7 +53,7 @@ export class CSV {
         if (!this.rows.length) return false;
 
         const firstRow = this.rows[0];
-        return firstRow.every(couldBeHeaderValue);
+        return firstRow.length && firstRow.every(couldBeHeaderValue);
     }
     makeReorder(columns) {
         let csv = new CSV();
@@ -76,12 +76,13 @@ export class CSV {
     }
     toString() {
         const headerText = this.hasHeader ? this.headings.join(",") + "\n" : "";
+        debugger;
         return headerText + this.rows.map(
-            row => row.map(CSV.escapeCsv).join(","))
+            row => row.map(CSV.escapeValue).join(","))
             .join("\n");
     }
     static escapeValue(value) {
-        return !/["\n,]/g.test(value) ?
+        return /["\n,]/g.test(value) ?
             `"${value.replaceAll('"', '""')}"` :
             value;
     };

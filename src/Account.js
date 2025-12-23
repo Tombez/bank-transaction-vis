@@ -56,7 +56,7 @@ const NamedMixin = memoMixin(Base => class extends Base {
         this.contentNode.appendChild(this.settingsNode)
         this.pageNode.appendChild(this.contentNode);
         this.header = document.createElement('div');
-        this.header.className = 'header';
+        this.header.className = 'header flash-highlight';
         this.btnWrapper = document.createElement('div');
         this.btnWrapper.className = 'btn-wrapper';
         this.header.appendChild(this.title);
@@ -69,6 +69,8 @@ const NamedMixin = memoMixin(Base => class extends Base {
             this.name = event.target.value;
         }}));
         this.name = name;
+
+        setTimeout(() => this.header.classList.remove('flash-highlight'), 1e3);
     }
     get name() {
         return this.settings[this.#nameSettingName];
@@ -188,18 +190,24 @@ export class Account extends Deletable(Collapsable(Named)) {
     static fromString(str) {
         const obj = JSON.parse(str);
     }
-    static searchTranFileForAccountName(tranFile) {
+    static searchTranFileForAccountCol(tranFile) {
+        if (!tranFile.csv.hasHeader) return -1;
+        return tranFile.csv.headings.findIndex(colName =>
+        /^account( name| number)?$/i.test(colName));
+    }
+    static searchTranFileForAccountNames(tranFile) {
         const csv = tranFile.csv;
-        let accountName = "";
+        let accountNames = new Set();
         if (csv.hasHeader) {
-            const accColIndex = csv.headings.findIndex(colName =>
-            /^account( name| number)?$/i.test(colName));
-            let hasAccountCol = accColIndex != -1;
-            if (hasAccountCol && csv.rows.length && csv.rows[0].length) {
-                accountName = csv.rows[0][accColIndex];
+            const accColIndex = Account.searchTranFileForAccountCol(tranFile);
+
+            if (accColIndex != -1) {
+                for (const row of csv.rows)
+                    if (row.length > accColIndex + 1)
+                        accountNames.add(row[accColIndex]);
             }
         }
-        return accountName;
+        return Array.from(accountNames.values());
     }
 }
 
@@ -372,34 +380,32 @@ export class TransactionFile extends Deletable(Collapsable(Named)) {
         this.contentNode.appendChild(tViewer.pageNode);
 
 
-        // Header need to exist here onwards
-        updateInputs();
-        if (!this.csv.hasHeader) {
-            return;
-        }
 
-        // Column Identification
-        for (const [regex, name] of colSearches) {
-            if (this.settings[name] > -1)
-                continue;
-            let colIndex = this.csv.headings.findIndex(colName =>
-                regex.test(colName));
-            
-            this.settings[name] = colIndex;
-        }
+        if (this.csv.hasHeader) {
+            // Column Identification
+            for (const [regex, name] of colSearches) {
+                if (this.settings[name] > -1)
+                    continue;
+                let colIndex = this.csv.headings.findIndex(colName =>
+                    regex.test(colName));
+                
+                this.settings[name] = colIndex;
+            }
 
-        if (!event || event.target != this.inputs['hasCdIndicator'] &&
-            parseInt(this.settings['cdIndicator']) == -1
-        ) {
-            // Check for credit/debit indicator
-            const cdIndicator = this.csv.headings.findIndex(colName =>
-                /^(credit debit )?indicator$/i.test(colName));
-            if (cdIndicator > -1) {
-                this.settings['hasCdIndicator'] = true;
-                this.settings['cdIndicator'] = cdIndicator;
+            if (!event || event.target != this.inputs['hasCdIndicator'] &&
+                parseInt(this.settings['cdIndicator']) == -1
+            ) {
+                // Check for credit/debit indicator
+                const cdIndicator = this.csv.headings.findIndex(colName =>
+                    /^(credit debit )?indicator$/i.test(colName));
+                if (cdIndicator > -1) {
+                    this.settings['hasCdIndicator'] = true;
+                    this.settings['cdIndicator'] = cdIndicator;
 
+                }
             }
         }
+
         updateInputs();
 
         this.isFullyFilled = colSearches.every(

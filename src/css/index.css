@@ -1,7 +1,11 @@
-body {
+html {
     --main-bg-color: rgb(27, 27, 37);
     --main-color: #cad2da;
     --drag-color: #423946;
+    scrollbar-color: var(--drag-color) var(--main-bg-color);
+    scrollbar-width: thin;
+}
+body {
     background-color: var(--main-bg-color);
     color: var(--main-color);
     font: 18px Ubuntu, sans-serif;
@@ -87,7 +91,8 @@ td, th {
     padding-left: 3px;
 }
 .table-content-wrapper {
-    overflow-y: auto; max-height: 75%;
+    overflow-y: auto;
+    max-height: 75vh;
 }
 .sticky-header {
     position: sticky;
@@ -108,7 +113,7 @@ div:has(>.header) {
     align-items: center;
     padding: 8px 4px 4px 4px;
     user-select: none;
-    -webkit-user-select: none
+    -webkit-user-select: none;
 }
 .file-title .emoji {
     color: orange;
@@ -186,6 +191,20 @@ div:has(>.header) {
     outline: calc(1px + 0.2vw) solid var(--drag-color);
     background: radial-gradient(var(--drag-color), var(--main-bg-color));
 }
+@keyframes flash {
+  0% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: #f8b332;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.flash-highlight {
+  animation: flash 1s linear forwards;
+}
 @media only screen and (max-width: 600px) {
     header {
         font-size: 3vw;
@@ -204,7 +223,7 @@ div:has(>.header) {
         margin-left: 8px;
     }
     .table-content-wrapper {
-        max-height: 50%;
+        max-height: 50vh;
     }
     canvas, #bank-list {
         width: 100%;

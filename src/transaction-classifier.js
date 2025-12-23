@@ -24,28 +24,12 @@ Array.prototype.best = function(toScore = a => a, direction = "min") {
 
 const canvasSize = {x: 800, y: 800};
 const graphs = [];
-let textInp = document.querySelector("#transaction-input");
-let unlabeledDiv = document.querySelector("#unlabeled");
-let addBankBtn = document.querySelector('#add-bank-btn');
-let exportBtn = document.querySelector('#export-btn');
+let textInp;
+let unlabeledDiv;
+let addBankBtn;
+let exportBtn;
 let classifiers = [];
 let bankList = window.bankList = [];
-
-addBankBtn.addEventListener('click', () => createNewBank('Default bank'));
-exportBtn.addEventListener('click', () => {
-    const btvText = JSON.stringify(bankList.map(b => b.encode()));
-    const filename = 'transactions.btv';
-    const blob = new Blob([btvText], {
-        type: 'data:attachment/plain;charset=utf-8'});
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    // Append the link to the document body (necessary for Firefox).
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-});
 
 const updateloop = () => {
     for (const graph of graphs) {
@@ -96,33 +80,45 @@ const readBtv = (text) => {
         alert('Failed to read btv file, ' + error);
     }
 };
+const exportBtv = () => {
+    const btvText = JSON.stringify(bankList.map(b => b.encode()));
+    const filename = 'transactions.btv';
+    const blob = new Blob([btvText], {
+        type: 'data:attachment/plain;charset=utf-8'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    // Append the link to the document body (necessary for Firefox).
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+};
 const loadCsvFile = (file, text) => {
     const csv = new CSV(text);
-    let tranFile = new TransactionFile(file, csv);
+    const firstFile = new TransactionFile(file, csv);
+    let tranFiles = [];
 
-    let accountName = Account.searchTranFileForAccountName(tranFile) || 'Default Account';
-    let account;
-    let bank = bankList.find(
-        bank => account = bank.accounts.find(a => a.name == accountName));
-    if (!account) {
-        // todo: identify account based on csv header
-    }
-    if (!account) { // create new account
-        account = new Account(accountName);
-        if (!bank) {
-            bank = Bank.findFromFile(tranFile, bankList);
-            if (!(bank instanceof Bank)) {
-                // Create new bank
-                bank = new Bank(bank);
-                addBank(bank);
-            }
+    let accountNames = Account.searchTranFileForAccountNames(firstFile);
+    if (accountNames.length > 1) {
+        const accColIndex = Account.searchTranFileForAccountCol(firstFile);
+        for (let i = 0; i < accountNames.length; ++i) {
+            const accName = accountNames[i];
+            const indices = new Array(csv.headings.length)
+                .map((_,i) => i + (i >= accColIndex));
+            const newCsv = csv.clone();
+            newCsv.rows = newCsv.rows.filter(row => row[accColIndex] == accName);
+            const name = accName;
+            tranFiles.push(new TransactionFile({name}, newCsv));
         }
-        bank.addAccount(account);
     }
-    account.addTransactionFile(tranFile);
+
+    if (!accountNames.length) accountNames.push('Default Account');
+    for (const tranFile of tranFiles)
+        addTransactionFile(tranFile);
 
     compileTransactions();
-}
+};
 const addBank = (bank) => {
     bankList.push(bank);
     const bankListDiv = document.querySelector('#bank-list');
@@ -136,7 +132,35 @@ const addBank = (bank) => {
         compileTransactions();
     });
     bank.pageNode.addEventListener('change', compileTransactions);
-}
+};
+const createNewBank = () => {
+    let newName = 'Default Bank';
+    for (let i = 1; bankList.find(bank => bank.name == newName); ++i)
+        newName = 'Default Bank ' + i;
+    let bank = new Bank(newName);
+    addBank(bank);
+};
+const addTransactionFile = (tranFile) => {
+    let account;
+    let bank = bankList.find(
+        bank => account = bank.accounts.find(a => a.name == tranFile.name));
+    if (!account) {
+        // todo: identify account based on csv header
+    }
+    if (!account) { // create new account
+        account = new Account(tranFile.name);
+        if (!bank) {
+            bank = Bank.findFromFile(tranFile, bankList);
+            if (!(bank instanceof Bank)) {
+                // Create new bank
+                bank = new Bank(bank);
+                addBank(bank);
+            }
+        }
+        bank.addAccount(account);
+    }
+    account.addTransactionFile(tranFile);
+};
 const compileTransactions = () => {
     let simpleCsv;
     for (const bank of bankList) {
@@ -762,10 +786,7 @@ const switchClassifier = (type, unique, label) => {
     };
 };
 
-const makeExample = event => {
-    let transactionInput = document.querySelector("#transaction-input");
-    transactionInput.addEventListener("change", transactionInputChange);
-
+const makeExample = () => {
     fetch("./example-graph.json").then(res => {
         res.json().then(encoded => {
             const root = decodeGraph(encoded);
@@ -786,6 +807,21 @@ const makeExample = event => {
         });
     });
 };
+const afterPageLoad = event => {
+    textInp = document.querySelector("#transaction-input");
+    unlabeledDiv = document.querySelector("#unlabeled");
+    addBankBtn = document.querySelector('#add-bank-btn');
+    exportBtn = document.querySelector('#export-btn');
 
-if (document.readyState !== "loading") makeExample();
-else document.addEventListener("DOMContentLoaded", makeExample);
+    addBankBtn.addEventListener('click', createNewBank);
+    exportBtn.addEventListener('click', exportBtv);
+
+
+    let transactionInput = document.querySelector("#transaction-input");
+    transactionInput.addEventListener("change", transactionInputChange);
+
+    makeExample();
+}
+
+if (document.readyState !== "loading") afterPageLoad();
+else document.addEventListener("DOMContentLoaded", afterPageLoad);

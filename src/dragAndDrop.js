@@ -7,7 +7,6 @@ export const makeDraggable = (node, data, handle = node) => {
         node.classList?.add('dragging');
         drug = data;
         event.dataTransfer.dropEffect = 'move';
-        console.log('drag start');
     };
     const endCallback = event => {
         node.classList?.remove('dragging');
@@ -25,17 +24,16 @@ export const makeDraggable = (node, data, handle = node) => {
     let hasTouched = false;
     handle.addEventListener('touchstart', (event) => {
         hasTouched = true;
-        console.log('touch start');
     });
     let prevOver = null;
     handle.addEventListener('touchmove', (event) => {
         if (!drug) return;
         event.preventDefault();
-        const touch = event.targetTouches[0];
-        const over = document.elementFromPoint(touch.clientX, touch.clientY);
+        const {clientX, clientY} = event.targetTouches[0];
+        const over = document.elementFromPoint(clientX, clientY);
         if (over && over != prevOver) {
             if (prevOver) prevOver.dispatchEvent(new CustomEvent('dragleave',
-                {bubbles: true}));
+                {bubbles: true, clientX, clientY}));
             over.dispatchEvent(new CustomEvent('dragenter', {bubbles: true}));
             prevOver = over;
         }
@@ -50,22 +48,34 @@ export const makeDraggable = (node, data, handle = node) => {
     
 };
 export const makeDroppable = (node, test, drop) => {
-    const dragOver = event => {
+    const dragEnter = event => {
         if (!test(drug)) return;
         event.preventDefault();
         node.classList.add('drag-over');
     };
+    const dragLeave = event => {
+        if (!test(drug)) return true;
+        if (!isPointInsideNode({x: event.clientX, y: event.clientY}, node)) {
+            event.preventDefault();
+            node.classList.remove('drag-over');
+        }
+    };
+    const dragOver = event => {
+        if (test(drug)) event.preventDefault();
+    };
+
+    node.addEventListener('dragenter', dragEnter);
+    node.addEventListener('dragleave', dragLeave);
     node.addEventListener('dragover', dragOver);
-    node.addEventListener('dragenter', dragOver);
-    node.addEventListener('dragleave', event => {
-        if (!test(drug)) return;
-        event.preventDefault();
-        node.classList.remove('drag-over');
-    });
     node.addEventListener('drop', event => {
         if (!test(drug)) return;
         event.preventDefault();
         node.classList.remove('drag-over');
         drop(drug);
     });
+};
+
+const isPointInsideNode = ({x, y}, node) => {
+    const box = node.getBoundingClientRect();
+    return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
 };

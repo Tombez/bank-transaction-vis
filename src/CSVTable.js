@@ -74,9 +74,15 @@ export class CSV {
     append(csv) {
         this.rows = this.rows.concat(csv.rows);
     }
+    clone() {
+        let clone = new CSV();
+        clone.hasHeader = this.hasHeader;
+        clone.headings = this.headings.slice();
+        clone.rows = this.rows.map(row => row.slice());
+        return clone;
+    }
     toString() {
         const headerText = this.hasHeader ? this.headings.join(",") + "\n" : "";
-        debugger;
         return headerText + this.rows.map(
             row => row.map(CSV.escapeValue).join(","))
             .join("\n");

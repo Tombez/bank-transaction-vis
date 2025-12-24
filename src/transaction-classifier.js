@@ -113,7 +113,7 @@ const loadCsvFile = (file, text) => {
         }
     }
 
-    if (!accountNames.length) accountNames.push('Default Account');
+    if (!tranFiles.length) tranFiles.push(firstFile);
     for (const tranFile of tranFiles)
         addTransactionFile(tranFile);
 
@@ -144,8 +144,12 @@ const addTransactionFile = (tranFile) => {
     let account;
     let bank = bankList.find(
         bank => account = bank.accounts.find(a => a.name == tranFile.name));
-    if (!account) {
-        // todo: identify account based on csv header
+    if (!account && tranFile.csv.hasHeader) {
+        // Identify account based on csv header
+        const header = tranFile.csv.headings.join();
+        bank = bankList.find(
+            bank => account = bank.accounts.find(
+                a => a.headerFormats.includes(header)));
     }
     if (!account) { // create new account
         account = new Account(tranFile.name);

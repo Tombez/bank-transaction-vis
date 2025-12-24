@@ -145,6 +145,7 @@ export class Account extends Deletable(Collapsable(Named)) {
             className: 'acc-title',
         });
         this.transactionFiles = [];
+        this.headerFormats = [];
         makeDroppable(this.pageNode, tranFile =>
                 tranFile instanceof TransactionFile && tranFile.account != this,
             tranFile => {
@@ -163,6 +164,11 @@ export class Account extends Deletable(Collapsable(Named)) {
         this.transactionFiles.push(tranFile);
         this.contentNode.appendChild(tranFile.pageNode);
         tranFile.account = this;
+        if (tranFile.csv.hasHeader) {
+            const header = tranFile.csv.headings.join();
+            if (!this.headerFormats.includes(header))
+                this.headerFormats.push(header);
+        }
     }
     removeTransactionFile(tranFile) {
         const index = this.transactionFiles.indexOf(tranFile);
@@ -310,8 +316,8 @@ export class Bank extends Deletable(Collapsable(Addable(Named))) {
 const colSearches = [
     [/^((transaction|trade|post(ed|ing)|effective) )?date$/i, 'date'],
     [/^(transaction )?description$/i, 'description'],
-    [/^(transaction |net )?amount|debits?$/i, 'debit'],
-    [/^(transaction |net )?amount|credits?$/i, 'credit'],
+    [/^(transaction |net )?amount|withdrawals?|debits?$/i, 'debit'],
+    [/^(transaction |net )?amount|deposits?|credits?$/i, 'credit'],
 ];
 export class TransactionFile extends Deletable(Collapsable(Named)) {
     constructor(file, csv) {

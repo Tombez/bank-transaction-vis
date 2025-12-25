@@ -6,9 +6,9 @@ import("./rules.js").then(mod => {
 import HierarchalPieGraph from "./HierarchalPieGraph.js";
 import FlowGraph from "./FlowGraph.js";
 import {CSV, removeCR} from "./CSVTable.js";
-import {Color} from "./color-utils.js";
-import {dateValToMdy, dateToYmd, mdyToDate, isDateStr} from "./date-utils.js";
+import {dateToYmd, mdyToDate, isDateStr} from "./date-utils.js";
 import BarGraph from "./BarGraph.js";
+import {ViewLineGraph} from "./Graph.js";
 import {Bank, Account, TransactionFile} from "./Account.js";
 Array.prototype.best = function(toScore = a => a, direction = "min") {
     if (!this.length) return null;
@@ -242,8 +242,8 @@ const loadTransactions = (csv) => {
             year += quarter == 3;
             quarter = (quarter + 1) % 4;
         }
-        let interestGraph = new BarGraph(title, interestData, interestLabels, canvasSize.x, 500);
-        document.body.appendChild(interestGraph.container);
+        let graph = new BarGraph(title, interestData, interestLabels, canvasSize.x, 500);
+        document.body.appendChild(graph.container);
         console.debug(interestCSV);
     };
     // addGraphForCategory('Interest', 'Quarterly Interest Earned');
@@ -256,6 +256,7 @@ const loadTransactions = (csv) => {
     let accounts = calculateDailyBalances(transactions);
 
     const accountValues = Array.from(accounts.values());
+    const accountNames = Array.from(accounts.keys());
     
     const stampRange = {
         min: accountValues.best(({stampRange: {min}}) => min).stampRange.min,
@@ -269,7 +270,8 @@ const loadTransactions = (csv) => {
     };
     balRange.diff = balRange.max - balRange.min;
     
-    makeBalancesGraph(transactions, accounts, stampRange, balRange);
+    
+    makeBalancesGraph(accountValues, accountNames, stampRange, balRange);
 
     // Make Net Worth Graph:
     {
@@ -430,164 +432,14 @@ const calculateDailyBalances = (transactions) => {
     }
     return accounts;
 };
-const makeBalancesGraph = (transactions, accounts, stampRange, balRange) => {
-    // Drawing setup
-    let canvas = document.createElement("canvas");
-    canvas.width = 800;
-    canvas.height = 600;
-    let ctx = canvas.getContext("2d");
-    ctx.fontName = '"Helvetica Neue", Helvetica, sans-serif';
-    ctx.setFontSize = function(size, {bold} = {}) {
-        this.font = `${bold ? 'bold ' : ''}${size}px ${this.fontName}`;
-    };
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.temp = function (cb) {this.save(); cb(); this.restore()};
-    ctx.temp(() => {
-        const axisSpace = {x: 50, y: 50};
-        ctx.translate(axisSpace.x, canvas.height - axisSpace.y);
-        const axisScaler = {x: (canvas.width - axisSpace.x) / canvas.width,
-            y: ((canvas.height - axisSpace.y) / canvas.height)};
-        ctx.scale(axisScaler.x, -1 * axisScaler.y * 0.95);
-
-        // Draw X Axes:
-        ctx.strokeStyle = "white";
-        ctx.fillStyle = "white";
-        ctx.textAlign = "right";
-        ctx.textBaseline = "middle";
-        ctx.setFontSize(16, {bold:true});
-        ctx.globalAlpha = 0.4;
-        const yStep = 2000;
-        ctx.beginPath();
-        for (let y = Math.floor(balRange.min / yStep) * yStep; y < balRange.max; y += yStep) {
-            const drawY = (y - balRange.min) / balRange.diff * canvas.height;
-            ctx.moveTo(0, drawY);
-            ctx.lineTo(canvas.width, drawY);
-            ctx.temp(() => {
-                ctx.globalAlpha = 1;
-                ctx.translate(-5, drawY);
-                ctx.scale(1.4, -1.4);
-                ctx.fillText(`$${y/1000|0}k`, 0, 0);
-            });
-        }
-        // Draw Y Axes:
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        const minYear = new Date(stampRange.min).getFullYear();
-        const maxYear = new Date(stampRange.max).getFullYear();
-        for (let year = minYear; year <= maxYear; ++year) {
-            const x = +new Date(year, 0, 1);
-            const drawX = (x - stampRange.min) / stampRange.diff * canvas.width;
-            ctx.moveTo(drawX, 0);
-            ctx.lineTo(drawX, canvas.height);
-            ctx.temp(() => {
-                ctx.globalAlpha = 1;
-                ctx.translate(drawX, -5);
-                ctx.scale(1.4, -1.4);
-                ctx.fillText(`'${new Date(x).getFullYear()-2000}`, 0, 0);
-            });
-        }
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-
-        // Generate Colors:
-        let colors = Array.from({length: accounts.size}, () => new Color());
-        let count = 0;
-        for (let step = 0.1; count < 20 && colors.length > 1; step *= 0.6, count++) {
-            let pairs = [];
-            for (let i = 0; i < colors.length; ++i) {
-                const color = colors[i];
-                let nearest = null;
-                for (let j = 0; j < colors.length; ++j) {
-                    if (j == i) continue;
-                    const cur = colors[j];
-                    const dist = color.dist(cur);
-                    if (!nearest || dist < color.dist(nearest))
-                        nearest = cur;
-                }
-                pairs.push([color, nearest]);
-            }
-            const moveFromExtremes = a => {
-                const margin = 0.20;
-                if (a.length() < margin) a.normalize().scale(0.25);
-                const fromWhite = a.diff(new Color(1, 1, 1));
-                const distWhite = fromWhite.length();
-                if (distWhite < margin)
-                    a.add(fromWhite.normalize().scale(margin - distWhite));
-            };
-            for (let [a, b] of pairs) {
-                const vector = a.diff(b).normalize().scale(step/2);
-                a.add(vector).clamp();
-                moveFromExtremes(a);
-                b.add(vector.scale(-1)).clamp();
-                moveFromExtremes(b);
-            }
-        }
-        
-        // Draw Data lines:
-        ctx.lineWidth = 4;
-        ctx.lineJoin = 'round';
-        for (const [accountName, account] of accounts.entries()) {
-            const {dailyBalance} = account;
-            
-            account.color = colors.shift();
-            ctx.strokeStyle = account.color.toString();
-            let dataPoints = [];
-            for (let i = 0, len = dailyBalance.length; i < len; ++i) {
-                const bal = dailyBalance[i];
-                const stamp = account.stampRange.min + i * Date.msDay;
-                const x = (stamp - stampRange.min) / stampRange.diff;
-                const y = (bal - balRange.min) / balRange.diff;
-                dataPoints.push({x, y});
-            }
-
-            if (dataPoints.length) {
-                ctx.beginPath();
-                ctx.moveTo(dataPoints[0].x * canvas.width, dataPoints[0].y * canvas.height);
-                for (let i = 1; i < dataPoints.length; ++i) {
-                    const point = dataPoints[i];
-                    ctx.lineTo(point.x * canvas.width, point.y * canvas.height);
-                }
-                ctx.stroke();
-            }
-        }
-
-        // Y baseline:
-        ctx.beginPath();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = "white";
-        const y0 = (0 - balRange.min) / balRange.diff;
-        ctx.moveTo(0, y0 * canvas.height);
-        ctx.lineTo(1 * canvas.width, y0 * canvas.height);
-        ctx.stroke();
-    });
-
-    // Draw Title:
-    ctx.fillStyle = "white";
-    ctx.globalAlpha = 0.8;
-    ctx.setFontSize(26, {bold:true});
-    ctx.fillText("Account Balances Over Time", canvas.width / 4, 20);
-    ctx.setFontSize(22, {bold:true});
-    ctx.fillText(`min bal: ${balRange.min | 0}, max bal: ${balRange.max | 0}`, canvas.width / 4, 40);
-    ctx.fillText(`first transaction date: ${dateValToMdy(stampRange.min)}`, canvas.width / 4, 60);
-    ctx.fillText(`last transaction date: ${dateValToMdy(stampRange.max)}`, canvas.width / 4, 80);
-    ctx.globalAlpha = 1;
-
-    // Draw Graph Key:
-    const keyFontSize = 22;
-    ctx.setFontSize(keyFontSize, {bold:true});
-    ctx.textAlign = "right";
-    ctx.textBaseline = "middle";
-    let y = 0;
-    for (const [accountName, account] of accounts.entries()) {
-        ctx.fillStyle = "white";
-        ctx.fillText(accountName, canvas.width - 30, y += keyFontSize + 4);
-        ctx.fillStyle = account.color;
-        ctx.fillRect(canvas.width - 20, y - 7, 10, 10);
-    }
-
-    graphs.push(canvas);
-    document.body.appendChild(canvas);
+const makeBalancesGraph = (accountValues, accountNames, stampRange, balRange) => {
+    const values = accountValues.map(a =>
+        a.dailyBalance.map((bal, i) => 
+            ({x: a.stampRange.min + i * Date.msDay, y: bal}))
+    );
+    const graph = new ViewLineGraph(values, accountNames, 800, 640, stampRange, balRange);
+    graphs.push(graph);
+    document.body.appendChild(graph.container);
 };
 
 const encodeGraph = root => {

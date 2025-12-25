@@ -149,16 +149,16 @@ div:has(>.header) {
     background-origin: content-box;
 }
 .icon-collapse {
-    background-image: url("/assets/arrows-collapse.svg");
+    background-image: url("../../assets/arrows-collapse.svg");
 }
 .icon-expand {
-    background-image: url("/assets/arrows-expand.svg");
+    background-image: url("../../assets/arrows-expand.svg");
 }
 .icon-delete  {
-    background-image: url("/assets/trash-bin.svg");
+    background-image: url("../../assets/trash-bin.svg");
 }
 .icon-add  {
-    background-image: url("/assets/plus.svg");
+    background-image: url("../../assets/plus.svg");
 }
 .content {
     margin-left: 10px;

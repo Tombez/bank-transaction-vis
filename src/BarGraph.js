@@ -1,4 +1,5 @@
 import {hsl} from "./color-utils.js";
+import {Graph} from './Graph.js';
 
 const defaultGraphOptions = {
     lineVsBar: false,
@@ -17,28 +18,20 @@ const defaultGraphOptions = {
 };
 let accentColor = hsl(defaultGraphOptions.defaultHue/360);
 
-export default class BarGraph {
-    constructor(_title, _values, _labels, _width, _height) {
+export default class BarGraph extends Graph {
+    constructor(title, values, labels, width, height) {
+        super(values, labels, width, height);
         this.options = JSON.parse(localStorage.getItem('graphOptions')) ?? defaultGraphOptions;
         this.optionPanel = new OptionPanel(this.options, () => this.dataUpdate());
-        this.title = _title;
-        this.values = _values;
-        this.labels = _labels;
+        this.title = title;
         this.constructHTML();
-        this.canvas.width = _width;
-        this.canvas.height = _height;
-        this.font = '"Helvetica Neue", Helvetica, sans-serif';
-        this.ctx = this.canvas.getContext('2d');
         this.dataUpdate();
-        this.canvas.addEventListener('mousemove', this.mousemove.bind(this));
-        this.canvas.addEventListener('mouseenter', this.mouseenter.bind(this));
-        this.canvas.addEventListener('mouseleave', this.mouseleave.bind(this));
     }
     constructHTML() {
-        this.container = document.createElement('div');
-        this.container.style = 'position: relative;';
-        this.canvas = document.createElement('canvas');
-        this.container.appendChild(this.canvas);
+        if (!this.optionPanel) {
+            super.constructHTML();
+            return;
+        }
         this.tooltipVLine = document.createElement('div');
         this.tooltipHLine = document.createElement('div');
         this.tooltipVLine.style = this.tooltipHLine.style = 'background: black; position: absolute; display: none; top: 0px; left: 0px;';
@@ -81,7 +74,7 @@ export default class BarGraph {
             this.valueStep = (parseInt(this.valueStep.toPrecision(1)) + 1) * Math.pow(10, this.valueStep.toString().length - 1);
         }
         this.largestValueLine = Math.ceil(this.highestValue / this.valueStep) * this.valueStep;
-        this.ctx.font = `bold ${this.options.fontSize}px ${this.font}`;
+        this.ctx.setFontSize(this.options.fontSize, true);
         const largestValueWidth = Math.ceil(this.ctx.measureText(this.largestValueLine).width);
         const valPad = this.options.valuePadding * 2;
         this.valueOffset = this.options.drawValues ? largestValueWidth + valPad : 0;
@@ -109,7 +102,7 @@ export default class BarGraph {
         ctx.strokeStyle = '#999';
         ctx.textBaseline = 'middle';
         ctx.textAlign = 'right';
-        this.ctx.font = `bold ${this.options.fontSize}px ${this.font}`;
+        this.ctx.setFontSize(this.options.fontSize, true);
         this.drawValues(ctx);
         ctx.rotate(-Math.PI/2);
         this.drawLabels(ctx);
@@ -130,7 +123,7 @@ export default class BarGraph {
     }
     drawTitle(ctx) {
         ctx.textAlign = 'center';
-        this.ctx.font = `bold ${this.options.fontSize + 4}px ${this.font}`;
+        ctx.setFontSize(this.options.fontSize + 4, true);
         ctx.fillText(this.title, ctx.canvas.width / 2, this.options.fontSize / 2 + this.options.labelPadding);
     }
     drawValues(ctx) {

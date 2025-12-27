@@ -3,101 +3,160 @@ import {fromDateString, dateToMdy} from "./date-utils.js";
 import memoMixin from "./memoMixin.js";
 import {CSV} from './CSVTable.js';
 import {makeDraggable, makeDroppable} from './dragAndDrop.js';
+import {LazyHtmlMixin, LazyHtml} from './LazyHtml.js';
 
 const capitalize = s => s.at(0).toUpperCase() +
     s.slice(1).toLowerCase();
 const sanitize$Text = text => text.replaceAll(/[^-\d\.]/g, "");
 
-const HasSetting = memoMixin(Base => class extends Base {
+const Settings = class extends LazyHtmlMixin(Map) {
+    #settings = [];
     constructor() {
         super();
-        this.settingsNode = document.createElement('div');
-        this.settings = {};
         this.inputs = {};
+        this.fragments = [];
     }
     settingChanged(event) {}
-    addSetting(type, name, settingText, events, options) {
+    add(type, name, settingText, events, options) {
         const unique = `${Date.now() % 1e8}-${Math.random() * 1e8 | 0}`;
-        const settingId = `setting-${unique}`;
+        const id = `setting-${unique}`;
+        const obj = {id, type, name, settingText, events, options};
+        if (this.hasNode) this.generateSetting(obj);
+        else this.#settings.push(obj);
+    }
+    generateSetting({id, type, name, settingText, events, options}) {
         const frag = document.createElement('div');
         const isSelect = type == 'select';
         const tagName = isSelect ? 'select' : 'input';
         const tagEnd = isSelect ? `>${
             options.map((op, i) => `<option value=${i}>${op}</option>`).join()
         }</select>` : '/>';
-        frag.innerHTML = `<label for="${settingId}">
-            <${tagName} class="setting" id="${settingId}" type="${type}"${tagEnd}
+        frag.innerHTML = `<label for="${id}">
+            <${tagName} class="setting" id="${id}" type="${type}"${tagEnd}
             ${settingText}
         </label>`;
-        this.settingsNode.appendChild(frag);
-        const setting = frag.querySelector('#' + settingId);
+        this.node.appendChild(frag);
+        const input = frag.querySelector('#' + id);
         for (const eventName in events) {
-            setting.addEventListener(eventName, event => {
+            input.addEventListener(eventName, event => {
                 if (event.target.type == 'checkbox')
                     event.target.value = event.target.checked;
                 events[eventName](event);
                 this.settingChanged(event);
             });
         }
-        return this.inputs[name] = setting;
+        this.inputs[name] = input;
     }
-});
+    generateHtml() {
+        super.generateHtml();
+        for (const setting of this.#settings) this.generateSetting(setting);
+        this.#settings.length = 0;
+        this.updateInputs();
+    }
+    updateInputs() {
+        if (!this.hasNode) return;
+        for (const [key, value] of this.entries()) {
+            const input = this.inputs[key];
+            if (input) {
+                input.value = value;
+                if (input.type === 'checkbox') input.checked = value;
+            }
+        }
+    }
+    fromEncoded(obj) {
+        for (const key in obj)
+            this.set(key, obj[key]);
+    }
+    encode() {
+        let obj = {};
+        for (const [key, value] of this.entries()) obj[key] = value;
+        return obj;
+    }
+};
 
-const NamedMixin = memoMixin(Base => class extends Base {
+const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Base) {
     #nameSettingName;
     #icon;
-    constructor(name, {settingName, icon, titleType, className}) {
+    constructor(name, {settingName, icon, titleType, titleClass}) {
         super();
-        this.pageNode = document.createElement('div');
-        this.title = document.createElement(titleType);
-        this.title.className = className;
-        this.contentNode = document.createElement('div');
-        this.contentNode.className = 'content';
-        this.contentNode.appendChild(this.settingsNode)
-        this.pageNode.appendChild(this.contentNode);
-        this.header = document.createElement('div');
-        this.header.className = 'header flash-highlight';
-        this.btnWrapper = document.createElement('div');
-        this.btnWrapper.className = 'btn-wrapper';
-        this.header.appendChild(this.title);
-        this.header.appendChild(this.btnWrapper);
-        this.pageNode.insertAdjacentElement('afterbegin', this.header);
-
         this.#nameSettingName = settingName;
         this.#icon = icon;
-        this.addSetting('text', settingName, `What is the name of the ${settingName}?`, ({change: event => {
+        this.titleType = titleType;
+        this.titleClass = titleClass;
+
+        this.settings = new Settings();
+        this.content = new LazyHtml();
+        this.content.className = 'content';
+        this.content.onGenerate = () => this.generateContentHtml();
+        
+        this.settings.add('text', settingName, `What is the name of the ${settingName}?`, ({change: event => {
             this.name = event.target.value;
         }}));
+        
         this.name = name;
-
+    }
+    generateHtml() {
+        super.generateHtml();
+        this.header = document.createElement('div');
+        this.header.className = 'header flash-highlight';
         setTimeout(() => this.header.classList.remove('flash-highlight'), 1e3);
+
+        this.title = document.createElement(this.titleType);
+        this.title.className = this.titleClass;
+        this.assignTitle(this.settings.get(this.#nameSettingName));
+        this.header.appendChild(this.title);
+
+        this.btnWrapper = document.createElement('div');
+        this.btnWrapper.className = 'btn-wrapper';
+        this.header.appendChild(this.btnWrapper);
+
+        this.node.appendChild(this.header);
+    }
+    generateContentHtml() {
+        this.content.node.appendChild(this.settings.node);
+        this.node.appendChild(this.content.node);
+    }
+    assignTitle(name) {
+        const title = capitalize(this.#nameSettingName);
+        if (!this.span) this.span = document.createElement('span');
+        this.span.className = 'emoji';
+        this.span.title = title;
+        this.span.innerText = this.#icon;
+
+        this.title.innerText = name;
+        this.title.prepend(this.span);
+
+        const event = new CustomEvent('rename', {detail: this, bubbles: true});
+        this.node.dispatchEvent(event);
     }
     get name() {
-        return this.settings[this.#nameSettingName];
+        return this.settings.get(this.#nameSettingName);
     }
     set name(name) {
-        this.settings[this.#nameSettingName] = name;
-        this.inputs[this.#nameSettingName].value = name;
-        const title = capitalize(this.#nameSettingName);
-        this.title.innerHTML = `<span class="emoji" title="${title}">${this.#icon}</span>${name}`;
-        const event = new CustomEvent('rename', {detail: this, bubbles: true});
-        this.pageNode.dispatchEvent(event);
+        this.settings.set(this.#nameSettingName, name);
+        if (this.hasNode) {
+            this.settings.inputs[this.#nameSettingName].value = name;
+            this.assignTitle(name);
+        }
     }
-});
+}));
 
 const Collapsable = memoMixin(Base => class extends Base {
     constructor(...args) {
         super(...args);
+    }
+    generateHtml() {
+        super.generateHtml();
         const collapseBtn = document.createElement('div');
-        collapseBtn.className = 'icon icon-collapse';
+        collapseBtn.className = 'icon icon-expand';
         this.btnWrapper.appendChild(collapseBtn);
         collapseBtn.addEventListener('click', event => {
-            if (this.contentNode.hidden) {
-                this.contentNode.hidden = false;
-                collapseBtn.className = 'icon icon-collapse';
+            if (!this.content.hasNode || this.content.node.hidden) {
+                this.content.node.hidden = false;
+                collapseBtn.classList.add('icon-collapse');
             } else {
-                this.contentNode.hidden = true;
-                collapseBtn.className = 'icon icon-expand';
+                this.content.node.hidden = true;
+                collapseBtn.classList.remove('icon-collapse');
             }
         });
     }
@@ -106,6 +165,9 @@ const Collapsable = memoMixin(Base => class extends Base {
 const Deletable = memoMixin(Base => class extends Base {
     constructor(...args) {
         super(...args);
+    }
+    generateHtml() {
+        super.generateHtml();
         const deleteBtn = document.createElement('div');
         deleteBtn.className = 'icon icon-delete';
         this.btnWrapper.appendChild(deleteBtn);
@@ -115,15 +177,18 @@ const Deletable = memoMixin(Base => class extends Base {
     }
     delete() {
         const event = new CustomEvent('delete', {detail: this, bubbles: true});
-        this.pageNode.dispatchEvent(event);
-        if (this.pageNode.parentNode) {
-            this.pageNode.parentNode.removeChild(this.pageNode);
+        this.node.dispatchEvent(event);
+        if (this.node.parentNode) {
+            this.node.parentNode.removeChild(this.node);
         }
     }
 });
 const Addable = memoMixin(Base => class extends Base {
     constructor(...args) {
         super(...args);
+    }
+    generateHtml() {
+        super.generateHtml();
         const addBtn = document.createElement('div');
         addBtn.className = 'icon icon-add';
         this.btnWrapper.appendChild(addBtn);
@@ -134,35 +199,40 @@ const Addable = memoMixin(Base => class extends Base {
     add() {}
 });
 
-const Named = NamedMixin(HasSetting());
+const Named = Deletable(NamedMixin());
 
-export class Account extends Deletable(Collapsable(Named)) {
+export class Account extends Named {
     constructor(name) {
         super(name, {
             settingName: 'account',
             icon: '🧾', 
             titleType: 'h3',
-            className: 'acc-title',
+            titleClass: 'acc-title',
         });
         this.transactionFiles = [];
         this.headerFormats = [];
-        makeDroppable(this.pageNode, tranFile =>
+        makeDroppable(this.node, tranFile =>
                 tranFile instanceof TransactionFile && tranFile.account != this,
             tranFile => {
                 tranFile.account.removeTransactionFile(tranFile);
                 this.addTransactionFile(tranFile);
                 const event = new CustomEvent('change', {bubbles:true});
-                this.pageNode.dispatchEvent(event);
+                this.node.dispatchEvent(event);
             });
-        makeDraggable(this.pageNode, this, this.header);
-        this.pageNode.addEventListener('delete', event => {
+        makeDraggable(this.node, this, this.header);
+        this.node.addEventListener('delete', event => {
             if (event.detail instanceof TransactionFile)
                 this.removeTransactionFile(event.detail);
         });
     }
+    generateContentHtml() {
+        super.generateContentHtml();
+        for (const tranFile of this.transactionFiles)
+            this.content.node.appendChild(tranFile.node);
+    }
     addTransactionFile(tranFile) {
         this.transactionFiles.push(tranFile);
-        this.contentNode.appendChild(tranFile.pageNode);
+        if (this.content.hasNode) this.content.node.appendChild(tranFile.node);
         tranFile.account = this;
         if (tranFile.csv.hasHeader) {
             const header = tranFile.csv.headings.join();
@@ -183,12 +253,12 @@ export class Account extends Deletable(Collapsable(Named)) {
     }
     encode() {
         return {
-            settings: this.settings,
+            settings: this.settings.encode(),
             transactionFiles: this.transactionFiles.map(t => t.encode())};
     }
     static decode(accountObj) {
         let account = new Account(accountObj.settings['account']);
-        account.settings = accountObj.settings;
+        account.settings.fromEncoded(accountObj.settings);
         accountObj.transactionFiles.forEach(t =>
             account.addTransactionFile(TransactionFile.decode(t)));
         return account;
@@ -199,7 +269,7 @@ export class Account extends Deletable(Collapsable(Named)) {
     static searchTranFileForAccountCol(tranFile) {
         if (!tranFile.csv.hasHeader) return -1;
         return tranFile.csv.headings.findIndex(colName =>
-        /^account( name| number)?$/i.test(colName));
+        /^(account|goal)( name| number)?$/i.test(colName));
     }
     static searchTranFileForAccountNames(tranFile) {
         const csv = tranFile.csv;
@@ -217,41 +287,46 @@ export class Account extends Deletable(Collapsable(Named)) {
     }
 }
 
-export class Bank extends Deletable(Collapsable(Addable(Named))) {
+export class Bank extends Addable(Named) {
     constructor(name) {
         super(name, {
             settingName: 'bank',
             icon: '🏦',
             titleType: 'h2',
-            className: 'bank-title'
+            titleClass: 'bank-title'
         });
         this.accounts = [];
 
-        // combine accounts with the same name
-        this.contentNode.addEventListener('rename', event => {
-            const target = event.detail;
-            if (!(target instanceof Account)) return;
-            this.checkDuplicateAccountName(target);
-        });
-
-        makeDroppable(this.pageNode, data => {
+        makeDroppable(this.node, data => {
                 return data instanceof Account && data.bank !== this;
             },
             account => {
                 account.bank.removeAccount(account);
                 this.addAccount(account);
                 const event = new CustomEvent('change', {bubbles:true});
-                this.pageNode.dispatchEvent(event);
+                this.node.dispatchEvent(event);
             });
-        this.pageNode.addEventListener('delete', event => {
+        this.node.addEventListener('delete', event => {
             if (event.detail instanceof Account)
                 this.removeAccount(event.detail);
+        });
+    }
+    generateContentHtml() {
+        super.generateContentHtml();
+        for (const account of this.accounts)
+            this.content.node.appendChild(account.node);
+
+        // combine accounts with the same name
+        this.content.node.addEventListener('rename', event => {
+            const target = event.detail;
+            if (!(target instanceof Account)) return;
+            this.checkDuplicateAccountName(target);
         });
     }
     addAccount(account) {
         if (this.checkDuplicateAccountName(account)) return;
         this.accounts.push(account);
-        this.contentNode.appendChild(account.pageNode);
+        if (this.content.hasNode) this.content.node.appendChild(account.node);
         account.bank = this;
     }
     removeAccount(account) {
@@ -281,12 +356,12 @@ export class Bank extends Deletable(Collapsable(Addable(Named))) {
     }
     encode() {
         return {
-            settings: this.settings,
+            settings: this.settings.encode(),
             accounts: this.accounts.map(a => a.encode())};
     }
     static decode(bankObj) {
         let bank = new Bank(bankObj.settings['bank']);
-        bank.settings = bankObj.settings;
+        bank.settings.fromEncoded(bankObj.settings);
         bankObj.accounts.forEach(a =>
             bank.addAccount(Account.decode(a)));
         return bank;
@@ -314,23 +389,23 @@ export class Bank extends Deletable(Collapsable(Addable(Named))) {
 }
 
 const colSearches = [
-    [/^((transaction|trade|post(ed|ing)|effective) )?date$/i, 'date'],
+    [/^((transaction|trade|post(ed|ing)|effective|booking) )?date( created)?$/i, 'date'],
     [/^(transaction )?description$/i, 'description'],
     [/^(transaction |net )?amount|withdrawals?|debits?$/i, 'debit'],
     [/^(transaction |net )?amount|deposits?|credits?$/i, 'credit'],
 ];
-export class TransactionFile extends Deletable(Collapsable(Named)) {
+export class TransactionFile extends Named {
     constructor(file, csv) {
         super(file.name, {
             settingName: 'file',
             icon: '📄',
             titleType: 'h4',
-            className: 'file-title'
+            titleClass: 'file-title'
         });
         this.csv = csv;
         csv.rows = csv.rows.filter(row => row.length);
         this.isFullyFilled = false;
-        this.addSetting('checkbox', 'hasHeader', 'Does this file have column names in the first row?', {change: event => {
+        this.settings.add('checkbox', 'hasHeader', 'Does this file have column names in the first row?', {change: event => {
             const checked = event.target.checked;
             if (checked && !csv.hasHeader) {
                 csv.headings = csv.rows.shift();
@@ -339,108 +414,103 @@ export class TransactionFile extends Deletable(Collapsable(Named)) {
                 csv.rows.unshift(csv.headings);
                 csv.hasHeader = false;
             }
-            this.settings['hasHeader'] = checked;
+            this.settings.set('hasHeader', checked);
         }});
-        this.settings['hasHeader'] = csv.hasHeader;
+        this.settings.set('hasHeader', csv.hasHeader);
 
         // Add Column Settings
         const colOptions = csv.headings || csv.rows[0];
         for (const [regex, name] of colSearches) {
-            this.addSetting('select', name, `Which column contains transaction ${name}s?`, {change: event => {
-                this.settings[name] = event.target.value;
+            this.settings.add('select', name, `Which column contains transaction ${name}s?`, {change: event => {
+                this.settings.set(name, event.target.value);
             }}, colOptions);
         }
 
-        let cdIndSetting;
-        this.addSetting('checkbox', 'hasCdIndicator', 'Is there a credit/debit indicator column?', {change: event => {
-            cdIndSetting.parentNode.style.display = event.target.checked ? 'block' : 'none';
-            this.settings['hasCdIndicator'] = event.target.checked;
+
+        this.settings.add('checkbox', 'hasCdIndicator', 'Is there a credit/debit indicator column?', {change: event => {
+            // cdIndSetting.parentNode.style.display = event.target.checked ? 'block' : 'none';
+            this.settings.set('hasCdIndicator', event.target.checked);
         }});
-        cdIndSetting = this.addSetting('select', 'cdIndicator', 'Which is the credit/debit indicator column?', {change: event => {
-            this.settings['cdIndicator'] = event.target.value;
+        this.settings.add('select', 'cdIndicator', 'Which is the credit/debit indicator column?', {change: event => {
+            this.settings.set('cdIndicator', event.target.value);
         }}, colOptions);
-        cdIndSetting.parentNode.style.display = 'none';
-
-        this.settingChanged(null, true);
-
-        makeDraggable(this.pageNode, this, this.header);
+        // cdIndSetting.parentNode.style.display = 'none';
     }
-    settingChanged(event, isFirstRun) {
-        const updateInputs = () => {
-            // Update Inputs:
-            for (const settingName in this.inputs) {
-                this.inputs[settingName].value = this.settings[settingName];
-                if (this.inputs[settingName].type == 'checkbox')
-                    this.inputs[settingName].checked = this.settings[settingName];
-            }
-            if (this.settings['hasCdIndicator']) {
-                this.inputs['cdIndicator'].parentNode.style.display = 'block';
-            }
-        };
+    generateHtml() {
+        super.generateHtml();
+        makeDraggable(this.node, this, this.header);
+        this.checkFullyFilled();
+    }
+    generateContentHtml() {
+        super.generateContentHtml();
+        this.settings.updateInputs();
 
         // Append Viewer
-        const oldViewer = this.pageNode.querySelector('.table-content-wrapper');
-        if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
+        // const oldViewer = this.node.querySelector('.table-content-wrapper');
+        // if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
         const header = this.csv.hasHeader && this.csv.headings;
         let tViewer = new TransactionViewer(header, this.csv.rows);
-        this.contentNode.appendChild(tViewer.pageNode);
-
-
+        this.content.node.appendChild(tViewer.node);
+    }
+    settingChanged(event) {
+        // if (this.settings.get('hasCdIndicator')) {
+        //     const cdIndicator = this.settings.inputs['cdIndicator'];
+        //     if (cdIndicator) cdIndicator.parentNode.style.display = 'block';
+        // }
 
         if (this.csv.hasHeader) {
             // Column Identification
             for (const [regex, name] of colSearches) {
-                if (this.settings[name] > -1)
+                if (this.settings.get(name) > -1)
                     continue;
                 let colIndex = this.csv.headings.findIndex(colName =>
                     regex.test(colName));
                 
-                this.settings[name] = colIndex;
+                this.settings.set(name, colIndex);
             }
 
-            if (!event || event.target != this.inputs['hasCdIndicator'] &&
-                parseInt(this.settings['cdIndicator']) == -1
+            if (!event || event.target != this.settings.inputs['hasCdIndicator'] &&
+                parseInt(this.settings.get('cdIndicator')) == -1
             ) {
                 // Check for credit/debit indicator
                 const cdIndicator = this.csv.headings.findIndex(colName =>
                     /^(credit debit )?indicator$/i.test(colName));
                 if (cdIndicator > -1) {
-                    this.settings['hasCdIndicator'] = true;
-                    this.settings['cdIndicator'] = cdIndicator;
-
+                    this.settings.set('hasCdIndicator', true);
+                    this.settings.set('cdIndicator', cdIndicator);
                 }
             }
         }
 
-        updateInputs();
-
+        this.checkFullyFilled();
+    }
+    checkFullyFilled() {
         this.isFullyFilled = colSearches.every(
-            ([,name]) => this.settings[name] > -1);
-        if (this.isFullyFilled) {
-            if (isFirstRun && this.isFullyFilled) {
-                // if (!this.pageNode.querySelector('.icon-collapse')) debugger;
-                this.pageNode.querySelector('.icon-collapse')?.click();
-            }
-            this.header.classList.add('fully-filled');
-        } else this.header.classList.remove('fully-filled');
+            ([,name]) => this.settings.get(name) > -1);
+        if (this.hasNode) {
+            if (this.isFullyFilled) {
+                this.header.classList.add('fully-filled');
+            } else this.header.classList.remove('fully-filled');
+        }
     }
     getSimplifiedCsv(accountName) {
-        const simpleCsv = this.csv.makeReorder([-1, this.settings['date'], -1, this.settings['description'], -1]);
+        const simpleCsv = this.csv.makeReorder([-1, this.settings.get('date'), -1, this.settings.get('description'), -1]);
         simpleCsv.headings = `Account,Transaction Date,Posted Date,Description,Amount`.split(',');
         if (!simpleCsv.rows.length) return simpleCsv;
         
         const amtCol = simpleCsv.headings.indexOf('Amount');
-        const indCol = this.settings['cdIndicator'];
+        const indCol = this.settings.get('cdIndicator');
         for (let y = 0; y < simpleCsv.rows.length; ++y) {
             const row = simpleCsv.rows[y];
             const oldRow = this.csv.rows[y];
-            let debit = oldRow[this.settings['debit']];
-            const credit = oldRow[this.settings['credit']];
-            const isDebit = this.settings['hasCdIndicator'] && indCol > -1 &&
-                /debit/i.test(oldRow[indCol]) || debit.startsWith('-');
+            let debit = sanitize$Text(oldRow[this.settings.get('debit')]);
+            const credit = sanitize$Text(oldRow[this.settings.get('credit')]);
+            const oneCol = this.settings.get('debit') === this.settings.get('credit');
+            const isDebit = this.settings.get('hasCdIndicator') && indCol > -1 &&
+                /debit/i.test(oldRow[indCol]) || !oneCol && debit;
             if (isDebit && !debit.startsWith('-'))
                 debit = '-' + debit;
-            row[amtCol] = sanitize$Text(isDebit ? debit : credit);
+            row[amtCol] = isDebit ? debit : credit;
         }
 
         for (const row of simpleCsv.rows) {
@@ -454,7 +524,7 @@ export class TransactionFile extends Deletable(Collapsable(Named)) {
     }
     encode() {
         return {
-            settings: this.settings,
+            settings: this.settings.encode(),
             csv: this.csv.toString()
         };
     }
@@ -462,8 +532,8 @@ export class TransactionFile extends Deletable(Collapsable(Named)) {
         const name = tranFileObj.settings['file'];
         const csv = new CSV(tranFileObj.csv);
         let tranFile = new TransactionFile({name}, csv);
-        tranFile.settings = tranFileObj.settings;
-        tranFile.settingChanged(null, true);
+        tranFile.settings.fromEncoded(tranFileObj.settings);
+        tranFile.checkFullyFilled();
         return tranFile;
     }
 }

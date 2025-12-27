@@ -72,7 +72,7 @@ const readBtv = (text) => {
         for (const bankObj of bankObjs) {
             const bank = Bank.decode(bankObj);
             addBank(bank);
-            bank.pageNode.querySelector('.icon-collapse')?.click();
+            bank.node.querySelector('.icon-collapse')?.click();
         }
         compileTransactions();
     } catch (error) {
@@ -108,7 +108,9 @@ const loadCsvFile = (file, text) => {
                 .map((_,i) => i + (i >= accColIndex));
             const newCsv = csv.clone();
             newCsv.rows = newCsv.rows.filter(row => row[accColIndex] == accName);
-            const name = accName;
+            let name = accName;
+            const match = file.name.match(/([^\.]+)((\.[a-z]+)*)/i);
+            if (match) name = `${match[1]}-${accName}${match[2]}`;
             tranFiles.push(new TransactionFile({name}, newCsv));
         }
     }
@@ -122,16 +124,16 @@ const loadCsvFile = (file, text) => {
 const addBank = (bank) => {
     bankList.push(bank);
     const bankListDiv = document.querySelector('#bank-list');
-    bankListDiv.appendChild(bank.pageNode);
-    bank.pageNode.addEventListener('delete', event => {
+    bankListDiv.appendChild(bank.node);
+    bank.node.addEventListener('delete', event => {
         const index = bankList.findIndex(
-            bank => bank.pageNode === event.target);
+            bank => bank.node === event.target);
         if (index > -1) {
             bankList.splice(index, 1);
         }
         compileTransactions();
     });
-    bank.pageNode.addEventListener('change', compileTransactions);
+    bank.node.addEventListener('change', compileTransactions);
 };
 const createNewBank = () => {
     let newName = 'Default Bank';
@@ -172,7 +174,6 @@ const compileTransactions = () => {
             for (const tranFile of account.transactionFiles) {
                 if (!tranFile.isFullyFilled) continue;
                 const cur = tranFile.getSimplifiedCsv(account.name);
-                console.debug('appending simple csv: ', cur);
                 if (!simpleCsv) simpleCsv = cur;
                 else simpleCsv.append(cur);
             }
@@ -414,8 +415,6 @@ const calculateDailyBalances = (transactions) => {
         let i = 0;
         let prevBal = 0;
         dailyChangeEntries.sort(([stampA], [stampB]) => stampA - stampB);
-        console.debug(accountName, account);
-        console.debug(accountName, "transactions:", accounts.get(accountName).transactions);
         for (const [curStamp, change] of dailyChangeEntries) {
             let stampI = Math.round((curStamp - stamp.min) / Date.msDay);
             for (; i < stampI; ++i) dailyBalance[i] = prevBal;

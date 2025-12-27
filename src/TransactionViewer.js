@@ -1,28 +1,32 @@
-export default class TransactionViewer {
-    constructor(header, transactions) {
-        this.header = header ?? [];
-        this.transactions = transactions;
+import {LazyHtml} from './LazyHtml.js';
 
-        this.pageNode = document.createElement('div');
-        this.pageNode.className = 'table-content-wrapper';
+export default class TransactionViewer extends LazyHtml {
+    constructor(header, transactions) {
+        super();
+        this.header = header;
+        this.transactions = transactions;
+    }
+    generateHtml() {
+        super.generateHtml();
+        this.node.className = 'table-content-wrapper';
         let tableHTML = `<table>
             <thead class="sticky-header">
                 ${
-                    header
+                    this.header
                     ?
                     `<tr>
-                        ${header.map(h => `<th scope="col">${h}</th>`).join("\n")}
+                        ${this.header.map(h => `<th scope="col">${h}</th>`).join("\n")}
                     </tr>`
                     :
                     ""
                 }
             </thead>
             <tbody>
-                ${transactions.map(t => `<tr>
+                ${this.transactions.map(t => `<tr>
                     ${t.map(d => `<td>${d}</td>`).join("\n")}
                 </tr>`).join("\n")}
             </tbody>
             </table>`;
-        this.pageNode.innerHTML = tableHTML;
+        this.node.innerHTML = tableHTML;
     }
 }

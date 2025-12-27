@@ -148,11 +148,11 @@ div:has(>.header) {
     box-shadow: 0 0 2px black inset;
     background-origin: content-box;
 }
-.icon-collapse {
-    background-image: url("../../assets/arrows-collapse.svg");
-}
 .icon-expand {
     background-image: url("../../assets/arrows-expand.svg");
+}
+.icon-collapse {
+    background-image: url("../../assets/arrows-collapse.svg");
 }
 .icon-delete  {
     background-image: url("../../assets/trash-bin.svg");

@@ -1,8 +1,3 @@
-import("./rules.js").then(mod => {
-    mod.addRules(addClassifier);
-}).catch(err => {
-    console.log(err);
-});
 import HierarchalPieGraph from "./HierarchalPieGraph.js";
 import FlowGraph from "./FlowGraph.js";
 import {CSV, removeCR} from "./CSVTable.js";
@@ -68,7 +63,9 @@ const transactionInputChange = event => {
 
 const readBtv = (text) => {
     try {
-        const bankObjs = JSON.parse(text);
+        const btv = JSON.parse(text)
+        const bankObjs = btv.banks;
+        if (btv.classifiers.length) classifiers = btv.classifiers;
         for (const bankObj of bankObjs) {
             const bank = Bank.decode(bankObj);
             addBank(bank);
@@ -81,7 +78,10 @@ const readBtv = (text) => {
     }
 };
 const exportBtv = () => {
-    const btvText = JSON.stringify(bankList.map(b => b.encode()));
+    const btvText = JSON.stringify({
+        banks: bankList.map(b => b.encode()),
+        classifiers
+    });
     const filename = 'transactions.btv';
     const blob = new Blob([btvText], {
         type: 'data:attachment/plain;charset=utf-8'});
@@ -94,6 +94,22 @@ const exportBtv = () => {
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
 };
+const loadRules = rules => {
+    for (const rule of rules) loadRule(rule);
+    console.log('classifiers', classifiers);
+};
+const loadRule = (rule, parentCategory) => {
+    let category = rule.category;
+    if (parentCategory)
+        category = `${parentCategory}/${category}`;
+    for (const typeName in rule.types) {
+        const uniques = rule.types[typeName];
+        addClassifier(typeName, uniques, category);
+    }
+    if (rule.subCategories)
+        for (const subRule of rule.subCategories)
+            loadRule(subRule, category);
+}
 const loadCsvFile = (file, text) => {
     const csv = new CSV(text);
     const firstFile = new TransactionFile(file, csv);
@@ -221,7 +237,7 @@ const loadTransactions = (csv) => {
     
     const minDateT = transactions.best(({timestamp}) => timestamp);
     const maxDateT = transactions.best(({timestamp}) => timestamp, "max");
-    const filterTransactions = (year, q) =>
+    const filterTransactions = (year, q = -1) =>
         transactions.filter(t =>
             (!year || t.year == year) && (!(q+1) || t.quarter == q));
 
@@ -251,7 +267,7 @@ const loadTransactions = (csv) => {
     // addGraphForCategory('Food', 'Quarterly Food Spending', true);
     // addGraphForCategory('Fuel', 'Quarterly Fuel Spending', true);
     
-    // makeOptions();
+    makeOptions(transactions, filterTransactions, minDateT, maxDateT);
 
 
     let accounts = calculateDailyBalances(transactions);
@@ -318,7 +334,7 @@ const loadTransactions = (csv) => {
         document.body.appendChild(netWorthGraph.container);
     }
 };
-const makeOptions = () => {
+const makeOptions = (transactions, filterTransactions, minDateT, maxDateT) => {
     // Make options:
     let options = "";
     const addOption = (value, text) =>
@@ -355,8 +371,8 @@ const makeOptions = () => {
         let filtered = filterTransactions(year, quar);
 
         const {root, income, ignored} = labelTransactions(filtered);
-        makeFlowGraph({root, income}, title);
         makeHPieGraph(root, title);
+        makeFlowGraph({root, income}, title);
 
         // Filter duplicates
         if (duplicatesBox.checked) {
@@ -468,22 +484,23 @@ const labelTransactions = transactions => {
     classifiers.sort((a,b) => b.unique.length - a.unique.length);
 
     for (const transaction of transactions) {
-        const {date, desc, amount} = transaction;
+        let {date, desc, amount} = transaction;
+        desc = desc.toLowerCase();
 
-        const [label, classifier] = labelTransaction(date, desc, amount);
+        let [label, classifier] = labelTransaction(date, desc, amount);
+        if (!label) {
+            label = 'Uncategorized';
+            let elm = document.createElement("pre");
+            elm.textContent = transaction.cols.join(",");
+            // unlabeledDiv.appendChild(elm);
+            // unlabeledDiv.style.display = "block";
+        }
         if (!classifier.transactions) classifier.transactions = [];
         classifier.transactions.push(transaction);
         transaction.classifier = classifier;
         const labels = label.split("/");
         transaction.labels = labels;
         const category = labels[0];
-
-        if (!category) {
-            let elm = document.createElement("pre");
-            elm.textContent = transaction.cols.join(",");
-            // unlabeledDiv.appendChild(elm);
-            // unlabeledDiv.style.display = "block";
-        }
 
         let curCategory = categories;
         for (const label of labels) {
@@ -680,3 +697,7 @@ const afterPageLoad = event => {
 
 if (document.readyState !== "loading") afterPageLoad();
 else document.addEventListener("DOMContentLoaded", afterPageLoad);
+
+import('./default-rules.json', { with: { type: 'json' } }).then(mod => {
+    loadRules(mod.default);
+}).catch(err => console.error(err));

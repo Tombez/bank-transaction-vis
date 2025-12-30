@@ -1,0 +1,142 @@
+[
+    {
+        "category": "Income",
+        "types": {
+            "has": ["deposit"]
+        },
+        "subCategories": [
+            {
+                "category": "Interest",
+                "types": {
+                    "has": ["dividend", "interest"]
+                }
+            },
+            {
+                "category": "Salary",
+                "types": {
+                    "has": ["salary", "payroll"]
+                }
+            }
+        ]
+    },
+    {
+        "category": "Ignored",
+        "types": {
+            "has": ["transfer"]
+        }
+    },
+    {
+        "category": "Fee",
+        "types": {
+            "has": ["fee"]
+        }
+    },
+    {
+        "category": "Transport",
+        "subCategories": [
+            {
+                "category": "Auto",
+                "subCategories": [
+                    {
+                        "category": "Fuel",
+                        "types": {
+                            "has": [
+                                "fuel",
+                                "gas",
+                                "oil",
+                                "casey's general stores",
+                                "murphy",
+                                "speedway",
+                                "allsup's",
+                                "pilot flying j",
+                                "fastrip",
+                                "circle k",
+                                "last stop",
+                                "phillips 66",
+                                "getgo",
+                                "maverik",
+                                "shell",
+                                "exxonmobil",
+                                "stinker 45",
+                                "chevron",
+                                "space age",
+                                "pilot",
+                                "fastrak",
+                                "seven feathers truck",
+                                "maruti",
+                                "kum&go",
+                                "l&l store",
+                                "caseys",
+                                "arco",
+                                "juniper junction",
+                                "texaco"
+                            ],
+                            "starts": [
+                                "76 -",
+                                "love "
+                            ]
+                        }
+                    }
+                ]
+            },
+            {
+                "category": "Transit",
+                "subCategories": [
+                    {
+                        "category": "Rail",
+                        "types": {
+                            "has": ["rail", "train", " line "]
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "category": "Food",
+        "subCategories": [
+            {
+                "category": "Unnecessary",
+                "types": {
+                    "has": [
+                        "coffee",
+                        "java",
+                        "ice cream",
+                        "sweet",
+                        "tea",
+                        "cake",
+                        "bakery",
+                        "cafe",
+                        "creamery",
+                        "donut",
+                        "cone",
+                        "panderia",
+                        "candy",
+                        "slushy",
+                        "menchies",
+                        "garrett abzun",
+                        "nectar frozen yog",
+                        "jamba juice",
+                        "one bar frozen",
+                        "dairy queen",
+                        "sonic drive in",
+                        "ppdutchbro",
+                        "ppdutch bros",
+                        "ppblackrock",
+                        "starbucks",
+                        "cinnabon",
+                        "beverage",
+                        "baskin",
+                        "prince puckle",
+                        "auntie anne's",
+                        "shop stop",
+                        "braums store",
+                        "honey farms",
+                        "andy's"
+                    ]
+                }
+            }
+        ]
+    }
+
+]

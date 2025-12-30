@@ -234,7 +234,8 @@ export default class HierarchyGraph {
 
             if (!cur.name) continue;
 
-            const color = hsl((sa+0.5*Math.PI) / (2*Math.PI), 1, colLight);
+            let color = hsl((sa+0.5*Math.PI) / (2*Math.PI), 1, colLight);
+            if (cur.name == 'Uncategorized') color = '#777';
             cur.color = color;
 
             const midAngle = (sa + ea)/2;

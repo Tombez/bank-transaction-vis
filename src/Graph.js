@@ -86,49 +86,9 @@ export class LineGraph extends Graph {
                 y: ((ctx.height - axisSpace.y) / ctx.height)};
             ctx.scale(axisScaler.x, -1 * axisScaler.y * 0.95);
     
-            // Draw X Axes:
-            ctx.strokeStyle = "white";
-            ctx.fillStyle = "white";
-            ctx.textAlign = "right";
-            ctx.textBaseline = "middle";
-            ctx.setFontSize(16, true);
-            ctx.globalAlpha = 0.4;
-            const yStep = 2000;
-            ctx.beginPath();
-            let y = Math.floor(dataRangeY.min / yStep) * yStep;
-            for (; y < dataRangeY.max; y += yStep) {
-                const drawY = (y - dataRangeY.min) / dataRangeY.diff * ctx.height;
-                ctx.moveTo(0, drawY);
-                ctx.lineTo(ctx.width, drawY);
-                ctx.temp(() => {
-                    ctx.globalAlpha = 1;
-                    ctx.translate(-5, drawY);
-                    ctx.scale(1.4, -1.4);
-                    ctx.fillText(`$${y/1000|0}k`, 0, 0);
-                });
-            }
-            // Draw Y Axes:
-            ctx.textAlign = "center";
-            ctx.textBaseline = "top";
-            const minYear = new Date(dataRangeX.min).getFullYear();
-            const maxYear = new Date(dataRangeX.max).getFullYear();
-            for (let year = minYear; year <= maxYear; ++year) {
-                const x = +new Date(year, 0, 1);
-                const drawX = (x - dataRangeX.min) / dataRangeX.diff * ctx.width;
-                ctx.moveTo(drawX, 0);
-                ctx.lineTo(drawX, ctx.height);
-                ctx.temp(() => {
-                    ctx.globalAlpha = 1;
-                    ctx.translate(drawX, -5);
-                    ctx.scale(1.4, -1.4);
-                    ctx.fillText(`'${new Date(x).getFullYear()-2000}`, 0, 0);
-                });
-            }
-            ctx.stroke();
-            ctx.globalAlpha = 1;
-            
             // Draw Data lines:
             ctx.lineWidth = 4;
+            ctx.globalAlpha = 0.7;
             ctx.lineJoin = 'round';
             for (const line of this.values) {
                 ctx.strokeStyle = line.color.toString();
@@ -152,6 +112,50 @@ export class LineGraph extends Graph {
                     ctx.stroke();
                 }
             }
+            ctx.globalAlpha = 1;
+            
+            // Draw X Axes:
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 2;
+            ctx.fillStyle = "white";
+            ctx.textAlign = "right";
+            ctx.textBaseline = "middle";
+            ctx.setFontSize(16, true);
+            ctx.globalAlpha = 0.4;
+            const yStep = 2000;
+            ctx.beginPath();
+            let y = Math.floor(dataRangeY.min / yStep) * yStep;
+            for (; y < dataRangeY.max; y += yStep) {
+                const drawY = (y - dataRangeY.min) / dataRangeY.diff * ctx.height;
+                ctx.moveTo(0, drawY);
+                ctx.lineTo(ctx.width, drawY);
+                ctx.temp(() => {
+                    ctx.globalAlpha = 1;
+                    ctx.translate(-5, drawY);
+                    ctx.scale(1.4, -1.4);
+                    ctx.fillText(`$${y/1000|0}k`, 0, 0);
+                });
+            }
+
+            // Draw Y Axes:
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            const minYear = new Date(dataRangeX.min).getFullYear();
+            const maxYear = new Date(dataRangeX.max).getFullYear();
+            for (let year = minYear; year <= maxYear; ++year) {
+                const x = +new Date(year, 0, 1);
+                const drawX = (x - dataRangeX.min) / dataRangeX.diff * ctx.width;
+                ctx.moveTo(drawX, 0);
+                ctx.lineTo(drawX, ctx.height);
+                ctx.temp(() => {
+                    ctx.globalAlpha = 1;
+                    ctx.translate(drawX, -5);
+                    ctx.scale(1.4, -1.4);
+                    ctx.fillText(`'${new Date(x).getFullYear()-2000}`, 0, 0);
+                });
+            }
+            ctx.stroke();
+            ctx.globalAlpha = 1;
     
             // Y baseline:
             ctx.beginPath();
@@ -166,16 +170,18 @@ export class LineGraph extends Graph {
         // Draw Title:
         ctx.fillStyle = "white";
         ctx.globalAlpha = 0.8;
+        const x = ctx.width / 2;
+        ctx.textAlign = 'center';
         ctx.setFontSize(26, true);
-        ctx.fillText("Account Balances Over Time", ctx.width / 4, 20);
+        ctx.fillText("Account Balances Over Time", x, 20);
         ctx.setFontSize(22, true);
-        ctx.fillText(`min bal: ${dataRangeY.min | 0}, max bal: ${dataRangeY.max | 0}`, ctx.width / 4, 40);
-        ctx.fillText(`first transaction date: ${dateValToMdy(dataRangeX.min)}`, ctx.width / 4, 60);
-        ctx.fillText(`last transaction date: ${dateValToMdy(dataRangeX.max)}`, ctx.width / 4, 80);
+        ctx.fillText(`min bal: ${dataRangeY.min | 0}, max bal: ${dataRangeY.max | 0}`, x, 40);
+        ctx.fillText(`first transaction date: ${dateValToMdy(dataRangeX.min)}`, x, 60);
+        ctx.fillText(`last transaction date: ${dateValToMdy(dataRangeX.max)}`, x, 80);
         ctx.globalAlpha = 1;
     
         // Draw Graph Key:
-        const keyFontSize = 22;
+        const keyFontSize = 18;
         ctx.setFontSize(keyFontSize, true);
         ctx.textAlign = "right";
         ctx.textBaseline = "middle";
@@ -221,6 +227,16 @@ export class ViewLineGraph extends LineGraph {
     }
     drawViewBar(ctx) {
         ctx.beginPath();
+        ctx.fillStyle = '#423946'
+        ctx.globalAlpha = 0.7;
+        const leftWidth = this.range.min - this.axisSpace.x;
+        const rightWidth = this.canvas.width - this.range.max;
+        ctx.rect(this.axisSpace.x, ctx.height, leftWidth, this.viewSliderHeight);
+        ctx.rect(this.range.max, ctx.height, rightWidth, this.viewSliderHeight);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        ctx.beginPath();
         ctx.strokeStyle = ctx.fillStyle = '#423946';
         ctx.moveTo(this.range.min, this.canvas.height);
         ctx.lineTo(this.range.min, this.ctx.height);
@@ -245,20 +261,35 @@ export class ViewLineGraph extends LineGraph {
             const r = this.ballRadius;
             if (mouse.x >= this.range.min - r && mouse.x <= this.range.min + r)
                 this.holding = 'min';
-            if (mouse.x >= this.range.max - r && mouse.x <= this.range.max + r)
+            else if (mouse.x >= this.range.max - r && mouse.x <= this.range.max + r)
                 this.holding = 'max';
 
+            if (this.holding) {
+                const mouseup = this.mouseup.bind(this);
+                window.addEventListener('mouseup', mouseup, {once: true});
+            }
         } else super.mousedown(event);
     }
     mouseup(event) {
         this.holding = null;
+        if (this.moveListener) {
+            window.removeEventListener('mousemove', this.moveListener);
+            this.moveListener = null;
+        }
     }
     mouseleave(event) {
-        this.mouseup(event);
+        if (this.holding && !this.moveListener) {
+            this.moveListener = this.mousemove.bind(this);
+            window.addEventListener('mousemove', this.moveListener);
+        }
     }
     mousemove(event) {
         if (this.holding) {
-            this.range[this.holding] = Math.max(event.offsetX, this.axisSpace.x);
+            const range = this.range;
+            const [min, max] = this.holding == 'min' ?
+                [this.axisSpace.x, range.max - 1] :
+                [range.min + 1, this.canvas.width];
+            range[this.holding] = Math.min(Math.max(event.offsetX, min), max);
             this.hasChanged = true;
         }
     }

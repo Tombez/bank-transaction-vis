@@ -1,41 +1,32 @@
-export default class FlowGraph {
-    constructor(layers, title, canvasSize) {
-        this.layers = layers;
-        this.title = title;
-        this.canvas = document.createElement("canvas");
-        this.ctx = this.canvas.getContext("2d");
+import {Graph} from './Graph.js';
 
-        this.canvas.width = canvasSize.x;
-        this.canvas.height = canvasSize.y;
+export default class FlowGraph extends Graph {
+    constructor(layers, title, size) {
+        super(title, null, null, size);
+        this.layers = layers;
+        
         this.verticalPad = 10;
         this.barWidth = 20;
         this.horizontalPad = 100;
-
-        this.mouse = {x: 0, y: 0};
-        this.attachListeners();
-
-        this.calculatePieces(layers);
     }
-    attachListeners() {
-        this.canvas.addEventListener("mousedown", event => {
-            const x = this.mouse.x = event.offsetX;
-            const y = this.mouse.y = event.offsetY;
+    generateHtml() {
+        super.generateHtml();
 
-            console.log(this.closestPiece.transactions.map(t=>t.cols.join(",")).join("\n"));
-        });
-        this.canvas.addEventListener("mouseup", event => {
-            
-        });
-        this.canvas.addEventListener("mousemove", event => {
-            this.mouse.x = event.offsetX;
-            this.mouse.y = event.offsetY;
-        });
-        this.canvas.addEventListener("mouseenter", event => {
-            this.focused = true;
-        });
-        this.canvas.addEventListener("mouseout", event => {
-            this.focused = false;
-        });
+        this.calculatePieces(this.layers);
+    }
+    pointerdown(event) {
+        super.pointerdown(event);
+        this.checkHover();
+
+        console.debug(this.closestPiece.transactions);
+    }
+    pointerenter(event) {
+        super.pointerenter(event);
+        this.focused = true;
+    }
+    pointerleave(event) {
+        super.pointerleave(event);
+        this.focused = false;
     }
     calculatePieces(layers) {
         this.horizontalGap = (
@@ -80,7 +71,7 @@ export default class FlowGraph {
                 let px = col.x + this.barWidth / 2;
                 let py = piece.y + piece.height / 2;
 
-                const distSq = (px - this.mouse.x)**2 + (py - this.mouse.y)**2;
+                const distSq = (px - this.pointer.x)**2 + (py - this.pointer.y)**2;
                 if (distSq < leastDistSq) {
                     leastDistSq = distSq;
                     this.closestPiece = piece;

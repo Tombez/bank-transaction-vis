@@ -1,12 +1,18 @@
 let drug;
 export const makeDraggable = (node, data, handle = node) => {
     handle.draggable = true;
+    let moveListener = (event) => {
+        const height = window.innerHeight;
+        if (event.screenY < height / 10) console.debug('scroll up');
+        else if (event.screenY > height * .9) console.debug('scroll down');
+    };
 
     // handlers:
     const dragStart = event => {
         node.classList?.add('dragging');
         drug = data;
         event.dataTransfer.dropEffect = 'move';
+        window.addEventListener('pointermove', moveListener);
     };
     const endCallback = event => {
         node.classList?.remove('dragging');
@@ -14,6 +20,7 @@ export const makeDraggable = (node, data, handle = node) => {
             prevOver.dispatchEvent(new CustomEvent('drop', {bubbles: true}));
             prevOver = null;
         }
+        window.removeEventListener('pointermove', moveListener);
     };
 
     // Listeners:
@@ -72,6 +79,7 @@ export const makeDroppable = (node, test, drop) => {
         event.preventDefault();
         node.classList.remove('drag-over');
         drop(drug);
+        drug = null;
     });
 };
 

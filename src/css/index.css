@@ -182,6 +182,12 @@ div:has(>.header) {
     margin-left: 8px;
     max-width: 800px;
 }
+.no-select {
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10+ and Edge */
+    user-select: none; /* Standard syntax */
+    -webkit-touch-callout: none; /* Disable callout menu on iOS */
+}
 *[draggable] {
     cursor: grab;
 }

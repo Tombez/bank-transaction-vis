@@ -1,9 +1,9 @@
-import HierarchalPieGraph from "./HierarchalPieGraph.js";
-import FlowGraph from "./FlowGraph.js";
+import HierarchalPieGraph from "./graphs/HierarchalPieGraph.js";
+import FlowGraph from "./graphs/FlowGraph.js";
 import {CSV, removeCR} from "./CSVTable.js";
 import {dateToYmd, mdyToDate, isDateStr} from "./date-utils.js";
-import BarGraph from "./BarGraph.js";
-import {ViewLineGraph} from "./Graph.js";
+import BarGraph from "./graphs/BarGraph.js";
+import {ViewLineGraph} from "./graphs/LineGraph.js";
 import {Bank, Account, TransactionFile} from "./Account.js";
 Array.prototype.best = function(toScore = a => a, direction = "min") {
     if (!this.length) return null;
@@ -36,7 +36,7 @@ updateloop();
 
 const removeGraphs = () => {
     for (let cur; cur = graphs.pop();) {
-        cur = cur.container || cur.canvas || cur;
+        cur = cur.node || cur.canvas || cur;
         document.body.removeChild(cur);
     }
 };
@@ -259,8 +259,9 @@ const loadTransactions = (csv) => {
             year += quarter == 3;
             quarter = (quarter + 1) % 4;
         }
-        let graph = new BarGraph(title, interestData, interestLabels, canvasSize.x, 500);
-        document.body.appendChild(graph.container);
+        const size = {x: canvasSize.x, y: 500};
+        let graph = new BarGraph(title, interestData, interestLabels, size);
+        document.body.appendChild(graph.node);
         console.debug(interestCSV);
     };
     // addGraphForCategory('Interest', 'Quarterly Interest Earned');
@@ -271,6 +272,7 @@ const loadTransactions = (csv) => {
 
 
     let accounts = calculateDailyBalances(transactions);
+    if (!accounts.size) return;
 
     const accountValues = Array.from(accounts.values());
     const accountNames = Array.from(accounts.keys());
@@ -327,11 +329,12 @@ const loadTransactions = (csv) => {
             dataPoints.push({x, y});
         }
 
-        let netWorthGraph = new BarGraph("Net Worth Over Time", totalDailyBalance, labels, canvasSize.x, 400);
+        const size = {x: canvasSize.x, y: 400};
+        let netWorthGraph = new BarGraph("Net Worth Over Time", totalDailyBalance, labels, size);
         console.debug("net worth graph", netWorthGraph);
         window.netWorthGraph = netWorthGraph;
         graphs.push(netWorthGraph);
-        document.body.appendChild(netWorthGraph.container);
+        document.body.appendChild(netWorthGraph.node);
     }
 };
 const makeOptions = (transactions, filterTransactions, minDateT, maxDateT) => {
@@ -405,7 +408,6 @@ const calculateDailyBalances = (transactions) => {
     let nonSweepTrans = transactions.filter(t => !t.desc.includes("Sweep") || t.desc == "Cash Sweep Interest");
     nonSweepTrans = nonSweepTrans.filter(t => !t.desc.match(/(Buy|Sell) [A-Z]{3,4}/));
     nonSweepTrans = nonSweepTrans.filter(t => !t.desc.match(/Transfer Received from Another Account [A-Z]{3,4}/));
-    nonSweepTrans = nonSweepTrans.filter(t => !t.desc.startsWith("Amazon Order "));
     let accounts = new Map();
     for (const t of nonSweepTrans) {
         const accountName = t.cols[0];
@@ -452,9 +454,10 @@ const makeBalancesGraph = (accountValues, accountNames, stampRange, balRange) =>
         a.dailyBalance.map((bal, i) => 
             ({x: a.stampRange.min + i * Date.msDay, y: bal}))
     );
-    const graph = new ViewLineGraph(values, accountNames, 800, 640, stampRange, balRange);
+    const title = 'Account Balances Over Time';
+    const graph = new ViewLineGraph(title, values, accountNames, 800, 640, stampRange, balRange);
     graphs.push(graph);
-    document.body.appendChild(graph.container);
+    document.body.appendChild(graph.node);
 };
 
 const encodeGraph = root => {
@@ -482,6 +485,8 @@ const labelTransactions = transactions => {
 
     // Match longer and therefore more specific rules first:
     classifiers.sort((a,b) => b.unique.length - a.unique.length);
+    // Match sub-categories first
+    classifiers.sort((a,b) => b.label.length - a.label.length);
 
     for (const transaction of transactions) {
         let {date, desc, amount} = transaction;
@@ -557,7 +562,7 @@ const makeHPieGraph = (root, title) => {
     let graph = new HierarchalPieGraph(root, title, canvasSize);
     graphs.push(graph);
     console.debug(title + " root:", graph.root);
-    document.body.appendChild(graph.canvas);
+    document.body.appendChild(graph.node);
     return graph;
 };
 const makeFlowGraph = ({root, income}, title) => {
@@ -602,7 +607,7 @@ const makeFlowGraph = ({root, income}, title) => {
 
     let graph = new FlowGraph(layers, title, {x: 1000, y: 600});
     graphs.push(graph);
-    document.body.appendChild(graph.canvas);
+    document.body.appendChild(graph.node);
     return graph;
 };
 const fillLayers = (root, layers, index = 0) => { // recursive
@@ -659,7 +664,7 @@ const switchClassifier = (type, unique, label) => {
 };
 
 const makeExample = () => {
-    fetch("./example-graph.json").then(res => {
+    fetch("./json/example-graph.json").then(res => {
         res.json().then(encoded => {
             const root = decodeGraph(encoded);
             makeHPieGraph(root, "Example");
@@ -698,6 +703,6 @@ const afterPageLoad = event => {
 if (document.readyState !== "loading") afterPageLoad();
 else document.addEventListener("DOMContentLoaded", afterPageLoad);
 
-import('./default-rules.json', { with: { type: 'json' } }).then(mod => {
+import('./json/default-rules.json', { with: { type: 'json' } }).then(mod => {
     loadRules(mod.default);
 }).catch(err => console.error(err));

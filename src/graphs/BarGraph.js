@@ -1,4 +1,4 @@
-import {hsl} from "./color-utils.js";
+import {hsl} from "../color-utils.js";
 import {Graph} from './Graph.js';
 
 const defaultGraphOptions = {
@@ -19,51 +19,43 @@ const defaultGraphOptions = {
 let accentColor = hsl(defaultGraphOptions.defaultHue/360);
 
 export default class BarGraph extends Graph {
-    constructor(title, values, labels, width, height) {
-        super(values, labels, width, height);
+    constructor(title, values, labels, size) {
+        super(title, values, labels, size);
         this.options = JSON.parse(localStorage.getItem('graphOptions')) ?? defaultGraphOptions;
-        this.optionPanel = new OptionPanel(this.options, () => this.dataUpdate());
-        this.title = title;
-        this.constructHTML();
+        
         this.dataUpdate();
     }
-    constructHTML() {
-        if (!this.optionPanel) {
-            super.constructHTML();
-            return;
-        }
+    generateHtml() {
+        super.generateHtml();
+        this.optionPanel = new OptionPanel(this.options, () => this.dataUpdate());
         this.tooltipVLine = document.createElement('div');
         this.tooltipHLine = document.createElement('div');
         this.tooltipVLine.style = this.tooltipHLine.style = 'background: black; position: absolute; display: none; top: 0px; left: 0px;';
         this.tooltipVLine.style.width = this.tooltipHLine.style.height = '1px';
         this.tooltipVLine.style.height = this.tooltipHLine.style.width = '100%';
-        this.container.appendChild(this.tooltipVLine);
-        this.container.appendChild(this.tooltipHLine);
-        this.container.appendChild(this.optionPanel.panel);
+        this.node.appendChild(this.tooltipVLine);
+        this.node.appendChild(this.tooltipHLine);
+        this.node.appendChild(this.optionPanel.panel);
     }
-    mousemove(event) {
+    pointerenter(event) {
+        super.pointerenter(event);
         if (this.options.tooltip) {
-            this.mouseX = event.clientX;
-            this.mouseY = event.clientY;
-        }
-    }
-    mouseenter(event) {
-        if (this.options.tooltip) {
-            this.mouseX = event.clientX;
-            this.mouseY = event.clientY;
+            this.pointer.x = event.clientX;
+            this.pointer.y = event.clientY;
             this.tooltipUpdate();
             this.tooltipVLine.style.display = this.tooltipHLine.style.display = 'block';
             this.tooltipUpdateInterval = setInterval(this.tooltipUpdate.bind(this), 33);
         }
     }
-    mouseleave(event) {
+    pointerleave(event) {
+        super.pointerleave(event);
         clearInterval(this.tooltipUpdateInterval);
         this.tooltipVLine.style.display = this.tooltipHLine.style.display = 'none';
     }
     tooltipUpdate() {
         let rect = this.canvas.getBoundingClientRect();
-        this.tooltipVLine.style.left = (this.mouseX - rect.left) + 'px';
-        this.tooltipHLine.style.top = (this.mouseY - rect.top) + 'px';
+        this.tooltipVLine.style.left = (this.pointer.x - rect.left) + 'px';
+        this.tooltipHLine.style.top = (this.pointer.y - rect.top) + 'px';
     }
     dataUpdate() {
         localStorage.setItem('graphOptions', JSON.stringify(this.options));
@@ -74,6 +66,8 @@ export default class BarGraph extends Graph {
             this.valueStep = (parseInt(this.valueStep.toPrecision(1)) + 1) * Math.pow(10, this.valueStep.toString().length - 1);
         }
         this.largestValueLine = Math.ceil(this.highestValue / this.valueStep) * this.valueStep;
+
+        if (!this.hasNode) return;
         this.ctx.setFontSize(this.options.fontSize, true);
         const largestValueWidth = Math.ceil(this.ctx.measureText(this.largestValueLine).width);
         const valPad = this.options.valuePadding * 2;
@@ -180,12 +174,12 @@ class Option {
         this.options = _options;
         this.changed = _changed;
         this.value = _options[_label];
-        this.container = document.createElement('span');
-        this.container.className = 'optionContainer';
+        this.node = document.createElement('span');
+        this.node.className = 'optionContainer';
         this.labelTag = document.createElement('div');
         this.labelTag.textContent = this.label + ':';
         this.labelTag.className = 'optionLabel';
-        this.container.appendChild(this.labelTag);
+        this.node.appendChild(this.labelTag);
     }
 }
 class BooleanOption extends Option {
@@ -202,7 +196,7 @@ class BooleanOption extends Option {
         this.ball.style.transform = (this.value ? 'translateX(100%)' : '');
         this.slider.appendChild(this.fill);
         this.slider.appendChild(this.ball);
-        this.container.appendChild(this.slider);
+        this.node.appendChild(this.slider);
         this.slider.addEventListener('click', event => {
             this.value = !this.value;
             this.ball.style.transform = (this.value ? 'translateX(100%)' : '');
@@ -220,11 +214,12 @@ class NumberOption extends Option {
         this.input.className = 'inputOption';
         this.input.value = this.value;
         this.input.style.color = accentColor;
-        this.container.appendChild(this.input);
+        this.node.appendChild(this.input);
         this.input.addEventListener('change', function(event) {
-        this.input.value = this.input.value.replace(/\.[\S\s]*/, '').replace(/\D/g, '');
-        this.options[this.label] = parseInt(this.input.value);
-        this.changed();
+            this.input.value = this.input.value.replace(/\.[\S\s]*/, '')
+                .replace(/\D/g, '');
+            this.options[this.label] = parseInt(this.input.value);
+            this.changed();
         }.bind(this));
     }
 }
@@ -238,42 +233,48 @@ class OptionPanel {
         };
         let optionArray = Object.keys(_options);
         for (let optionKey of optionArray) {
-            this.panel.appendChild(new this.typeMap[typeof _options[optionKey]](optionKey, _options, _changed).container);
+            this.panel.appendChild(new this.typeMap[typeof _options[optionKey]](optionKey, _options, _changed).node);
         }
-        let boundFunctions = ['mousemove', 'mousedown', 'mouseup', 'keydown', 'move'];
+        this.pointer = {x: 0, y: 0};
+        let boundFunctions = ['pointermove', 'pointerdown', 'pointerup', 'keydown', 'move'];
         for (let name of boundFunctions) {
             this[name] = this[name].bind(this);
         }
-        this.panel.addEventListener('mousedown', this.mousedown);
-        window.addEventListener('mouseup', this.mouseup);
+        this.panel.addEventListener('pointerdown', this.pointerdown);
+        window.addEventListener('pointerup', this.pointerup);
         window.addEventListener('keydown', this.keydown);
     }
-    mousedown(event) {
+    setPointer(event) {
+        this.pointer.x = event.offsetX * window.devicePixelRatio;
+        this.pointer.y = event.offsetY * window.devicePixelRatio;
+    }
+    pointerdown(event) {
+        this.setPointer(event);
         if (event.target.tagName.toLowerCase() != 'input' && event.which == 1) {
             event.preventDefault();
             document.activeElement.blur();
-            this.mousemove(event);
+            this.pointermove(event);
             let rect = this.panel.getBoundingClientRect();
             this.diffX = event.clientX - rect.left;
             this.diffY = event.clientY - rect.top;
-            window.addEventListener('mousemove', this.mousemove);
+            window.addEventListener('pointermove', this.pointermove);
             this.moveInterval = setInterval(this.move, 33);
         }
     }
-    mouseup(event) {
+    pointerup(event) {
+        this.setPointer(event);
         if (event.which == 1 && this.moveInterval) {
-            window.removeEventListener('mousemove', this.mousemove);
+            window.removeEventListener('pointermove', this.pointermove);
             clearInterval(this.moveInterval);
             this.moveInterval = null;
         }
     }
-    mousemove(event) {
-        this.mouseX = event.clientX;
-        this.mouseY = event.clientY;
+    pointermove(event) {
+        this.setPointer(event);
     }
     move() {
-        this.panel.style.left = (this.mouseX - this.diffX) + 'px';
-        this.panel.style.top = (this.mouseY - this.diffY) + 'px';
+        this.panel.style.left = (this.pointer.x - this.diffX) + 'px';
+        this.panel.style.top = (this.pointer.y - this.diffY) + 'px';
     }
     keydown(event) {
         if (event.target.tagName.toLowerCase() != 'input' && event.keyCode == 79) { // 'o'

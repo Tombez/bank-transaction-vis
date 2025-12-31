@@ -22,13 +22,33 @@
     {
         "category": "Ignored",
         "types": {
-            "has": ["transfer"]
-        }
+            "has": ["transfer", "ach xfer"]
+        },
+        "subCategories": [
+            {
+                "category": "Cash",
+                "types": {
+                    "has": ["atm", "atm deposit"]
+                }
+            },
+            {
+                "category": "Verify",
+                "types": {
+                    "has": ["acctverify"]
+                }
+            }
+        ]
     },
     {
         "category": "Fee",
         "types": {
             "has": ["fee"]
+        }
+    },
+    {
+        "category": "Tax",
+        "types": {
+            "has": ["IRS", "department of revenue"]
         }
     },
     {

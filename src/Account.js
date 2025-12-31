@@ -245,6 +245,7 @@ export class Account extends Named {
         if (index > -1) {
             this.transactionFiles.splice(index, 1);
         }
+        tranFile.node.parentNode.removeChild(tranFile.node);
         tranFile.account = null;
     }
     absorb(account) {
@@ -298,7 +299,7 @@ export class Bank extends Addable(Named) {
         this.accounts = [];
 
         makeDroppable(this.node, data => {
-                return data instanceof Account && data.bank !== this;
+                return data instanceof Account && !this.accounts.includes(data);
             },
             account => {
                 account.bank.removeAccount(account);
@@ -336,6 +337,7 @@ export class Bank extends Addable(Named) {
                 this.accounts[index] = this.accounts.pop();
             else this.accounts.pop();
             account.bank = null;
+            account.node.parentNode.removeChild(account.node);
         }
     }
     checkDuplicateAccountName(accountA) {
@@ -435,6 +437,8 @@ export class TransactionFile extends Named {
             this.settings.set('cdIndicator', event.target.value);
         }}, colOptions);
         // cdIndSetting.parentNode.style.display = 'none';
+
+        this.settingChanged();
     }
     generateHtml() {
         super.generateHtml();

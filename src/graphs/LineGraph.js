@@ -1,43 +1,10 @@
-
-import {Color} from "./color-utils.js";
-import {dateValToMdy} from "./date-utils.js";
-
-export class Graph {
-    constructor(values, labels, width, height) {
-        this.values = values;
-        this.labels = labels;
-        this.constructHTML();
-        this.ctx = this.canvas.getContext('2d');
-        this.ctx.width = this.canvas.width = width;
-        this.ctx.height = this.canvas.height = height;
-        this.fontName = '"Helvetica Neue", Helvetica, sans-serif';
-        this.ctx.setFontSize = function(size, bold) {
-            this.font = `${bold ? 'bold ' : ''}${size}px ${this.fontName}`;
-        };
-        this.canvas.addEventListener('mousemove', this.mousemove.bind(this));
-        this.canvas.addEventListener('mouseenter', this.mouseenter.bind(this));
-        this.canvas.addEventListener('mouseleave', this.mouseleave.bind(this));
-        this.canvas.addEventListener('mousedown', this.mousedown.bind(this));
-        this.canvas.addEventListener('mouseup', this.mouseup.bind(this));
-    }
-    constructHTML() {
-        this.container = document.createElement('div');
-        this.container.classList.add('graph-container');
-        this.container.style = 'position: relative;';
-        this.canvas = document.createElement('canvas');
-        this.container.appendChild(this.canvas);
-    }
-    mousemove(event) {}
-    mouseenter(event) {}
-    mouseleave(event) {}
-    mousedown(event) {}
-    mouseup(event) {}
-}
+import {Graph} from './Graph.js';
+import {Color} from "../color-utils.js";
+import {dateValToMdy} from '../date-utils.js';
 
 export class LineGraph extends Graph {
     constructor(...args) {
         super(...args);
-        this.ctx.temp = function (cb) {this.save(); cb(); this.restore()};
         this.axisSpace = {x: 50, y: 50};
         this.generateColors();
     }
@@ -142,6 +109,7 @@ export class LineGraph extends Graph {
             ctx.textBaseline = "top";
             const minYear = new Date(dataRangeX.min).getFullYear();
             const maxYear = new Date(dataRangeX.max).getFullYear();
+            const yearCount = maxYear - minYear;
             for (let year = minYear; year <= maxYear; ++year) {
                 const x = +new Date(year, 0, 1);
                 const drawX = (x - dataRangeX.min) / dataRangeX.diff * ctx.width;
@@ -156,6 +124,7 @@ export class LineGraph extends Graph {
             }
             ctx.stroke();
             ctx.globalAlpha = 1;
+            if (yearCount < 3)
     
             // Y baseline:
             ctx.beginPath();
@@ -173,7 +142,7 @@ export class LineGraph extends Graph {
         const x = ctx.width / 2;
         ctx.textAlign = 'center';
         ctx.setFontSize(26, true);
-        ctx.fillText("Account Balances Over Time", x, 20);
+        ctx.fillText(this.title, x, 20);
         ctx.setFontSize(22, true);
         ctx.fillText(`min bal: ${dataRangeY.min | 0}, max bal: ${dataRangeY.max | 0}`, x, 40);
         ctx.fillText(`first transaction date: ${dateValToMdy(dataRangeX.min)}`, x, 60);
@@ -198,16 +167,19 @@ export class LineGraph extends Graph {
 }
 
 export class ViewLineGraph extends LineGraph {
-    constructor(values, labels, width, height, dataRangeX, dataRangeY) {
-        super(values, labels, width, height);
+    constructor(title, values, labels, width, height, dataRangeX, dataRangeY) {
+        super(title, values, labels, width, height);
         this.viewSliderHeight = 40;
         this.ballRadius = this.viewSliderHeight / 6;
-        this.ctx.height -= this.viewSliderHeight;
         this.range = {min: this.axisSpace.x, max: width};
         this.holding;
         this.dataRangeX = dataRangeX;
         this.dataRangeY = dataRangeY;
         this.hasChanged = true;
+    }
+    generateHtml() {
+        super.generateHtml();
+        this.ctx.height -= this.viewSliderHeight;
     }
     update() {
         if (this.hasChanged) {
@@ -255,41 +227,42 @@ export class ViewLineGraph extends LineGraph {
             ctx.fill();
         }
     }
-    mousedown(event) {
+    pointerdown(event) {
         if (event.offsetY >= this.ctx.height) {
-            const mouse = {x: event.offsetX, y: event.offsetY};
+            const pointer = this.setPointer(event);
             const r = this.ballRadius;
-            if (mouse.x >= this.range.min - r && mouse.x <= this.range.min + r)
+            if (pointer.x >= this.range.min - r && pointer.x <= this.range.min + r)
                 this.holding = 'min';
-            else if (mouse.x >= this.range.max - r && mouse.x <= this.range.max + r)
+            else if (pointer.x >= this.range.max - r && pointer.x <= this.range.max + r)
                 this.holding = 'max';
 
             if (this.holding) {
-                const mouseup = this.mouseup.bind(this);
-                window.addEventListener('mouseup', mouseup, {once: true});
+                const pointerup = this.pointerup.bind(this);
+                window.addEventListener('pointerup', pointerup, {once: true});
             }
-        } else super.mousedown(event);
+        } else super.pointerdown(event);
     }
-    mouseup(event) {
+    pointerup(event) {
         this.holding = null;
         if (this.moveListener) {
-            window.removeEventListener('mousemove', this.moveListener);
+            window.removeEventListener('pointermove', this.moveListener);
             this.moveListener = null;
         }
     }
-    mouseleave(event) {
+    pointerleave(event) {
         if (this.holding && !this.moveListener) {
-            this.moveListener = this.mousemove.bind(this);
-            window.addEventListener('mousemove', this.moveListener);
+            this.moveListener = this.pointermove.bind(this);
+            window.addEventListener('pointermove', this.moveListener);
         }
     }
-    mousemove(event) {
+    pointermove(event) {
+        this.setPointer(event);
         if (this.holding) {
             const range = this.range;
             const [min, max] = this.holding == 'min' ?
                 [this.axisSpace.x, range.max - 1] :
                 [range.min + 1, this.canvas.width];
-            range[this.holding] = Math.min(Math.max(event.offsetX, min), max);
+            range[this.holding] = Math.min(Math.max(this.pointer.x, min), max);
             this.hasChanged = true;
         }
     }

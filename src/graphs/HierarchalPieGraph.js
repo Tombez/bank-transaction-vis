@@ -1,7 +1,9 @@
-import {hsl} from "./color-utils.js";
+import {hsl} from "../color-utils.js";
+import {Graph} from './Graph.js';
 
-export default class HierarchyGraph {
-    constructor(root, title, canvasSize) {
+export default class HierarchyGraph extends Graph {
+    constructor(root, title, size) {
+        super(title, null, null, size);
         this.root = root;
         this.title = title;
         this.outerRadius = 450;
@@ -11,51 +13,62 @@ export default class HierarchyGraph {
         this.texts = [];
         this.hoverBox = null;
         this.dragging = null;
-        this.mouse = {x: 0, y: 0};
+        this.radialPointer = {x: 0, y: 0};
+        this.touchAction = 'none';
 
         const radius = (this.outerRadius-this.innerRadius)/3+this.innerRadius;
-
-        this.canvas.width = canvasSize.x;
-        this.canvas.height = canvasSize.y;
-        this.attachListeners();
         this.calculatePieces(root.children, root.total, 0, 2*Math.PI, this.innerRadius, radius);
     }
-    attachListeners() {
-        this.canvas.addEventListener("mousedown", event => {
-            const x = this.mouse.x = event.offsetX - event.target.width/2;
-            const y = this.mouse.y = event.offsetY - event.target.height/2;
+    setPointer(event) {
+        super.setPointer(event);
+        this.radialPointer.x = this.pointer.x - this.canvas.width / 2;
+        this.radialPointer.y = this.pointer.y - this.canvas.height / 2;
+    }
+    pointerdown(event) {
+        console.debug('pointerdown');
+        super.pointerdown(event);
+        event.preventDefault();
+        const {x, y} = this.radialPointer;
 
-            // let mAngle = Math.atan2(this.mouse.y, this.mouse.x);
-            // if (mAngle < -0.5*Math.PI) mAngle += 2*Math.PI;
-            // const mRadius = Math.hypot(this.mouse.x, this.mouse.y);
-            // let hoverSector = whichSector(mAngle, mRadius, root.children);
-            // if (hoverSector) {
-            //     root = hoverSector;
-            //     texts = [];
-            //     this.calculatePieces(root.children, root.total, -0.5*Math.PI, 1.5*Math.PI, innerRadius, radius);
-            // }
+        // let mAngle = Math.atan2(this.radialPointer.y, this.radialPointer.x);
+        // if (mAngle < -0.5*Math.PI) mAngle += 2*Math.PI;
+        // const mRadius = Math.hypot(this.radialPointer.x, this.radialPointer.y);
+        // let hoverSector = whichSector(mAngle, mRadius, root.children);
+        // if (hoverSector) {
+        //     root = hoverSector;
+        //     texts = [];
+        //     this.calculatePieces(root.children, root.total, -0.5*Math.PI, 1.5*Math.PI, innerRadius, radius);
+        // }
 
-            // Find closest text to mouse
-            const [minText, minDist] = this.texts.reduce(([minText, min], text) => {
-                const tx = text.drawLoc.x;
-                const ty = text.drawLoc.y;
+        // Find closest text to pointer
+        const [minText, minDist] = this.texts.reduce(([minText, min], text) => {
+            const tx = text.drawLoc.x;
+            const ty = text.drawLoc.y;
 
-                const distSq = (x - tx) ** 2 + (y - ty) ** 2;
-                return distSq < min ? [text, distSq] : [minText, min];
-            }, [null, Infinity]);
-            if (minDist < 20 ** 2) this.dragging = minText;
-        });
-        this.canvas.addEventListener("mouseup", event => {
-            this.dragging = null;
-        });
-        this.canvas.addEventListener("mousemove", event => {
-            this.mouse.x = event.offsetX - event.target.width / 2;
-            this.mouse.y = event.offsetY - event.target.height / 2;
-            if (this.dragging) {
-                this.dragging.drawLoc.x = this.mouse.x;
-                this.dragging.drawLoc.y = this.mouse.y;
-            }
-        });
+            const distSq = (x - tx) ** 2 + (y - ty) ** 2;
+            return distSq < min ? [text, distSq] : [minText, min];
+        }, [null, Infinity]);
+        if (minDist < 20 ** 2) this.dragging = minText;
+    }
+    pointerup(event) {
+        super.pointerup(event);
+        this.dragging = null;
+        console.debug('pointerup');
+    }
+    pointermove(event) {
+        super.pointermove(event);
+        console.debug('pointermove');
+        if (this.dragging) {
+            this.dragging.drawLoc.x = this.radialPointer.x;
+            this.dragging.drawLoc.y = this.radialPointer.y;
+        }
+    }
+    contextmenu(event) {
+        console.debug('context menu, dragging: ', !!this.dragging);
+        if (this.dragging) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
     }
     textCollisions() {
         for (let i = 0; i < this.texts.length; ++i) {
@@ -89,17 +102,18 @@ export default class HierarchyGraph {
         return null;
     }
     checkHover(pieces) {
-        let mAngle = Math.atan2(this.mouse.y, this.mouse.x);
+        const pointer = this.radialPointer;
+        let mAngle = Math.atan2(pointer.y, pointer.x);
         if (mAngle < 0) mAngle += 2*Math.PI;
-        const mRadius = Math.hypot(this.mouse.x, this.mouse.y);
+        const mRadius = Math.hypot(pointer.x, pointer.y);
         let hoverSector = this.whichSector(mAngle, mRadius, this.root.children);
         if (!hoverSector) {
             this.hoverBox = null;
             return;
         }
         this.hoverBox = {
-            x: this.mouse.x + 10,
-            y: this.mouse.y + 10,
+            x: pointer.x + 10,
+            y: pointer.y + 10,
             lines: [
                 `Name: ${hoverSector.name}`,
                 `Percent: ${(hoverSector.percent*100).toFixed(2)}%`,

@@ -22,6 +22,7 @@ export default class BarGraph extends Graph {
     constructor(title, values, labels, size) {
         super(title, values, labels, size);
         this.options = JSON.parse(localStorage.getItem('graphOptions')) ?? defaultGraphOptions;
+        this.hasChanged = true;
         
         this.dataUpdate();
     }
@@ -36,6 +37,8 @@ export default class BarGraph extends Graph {
         this.node.appendChild(this.tooltipVLine);
         this.node.appendChild(this.tooltipHLine);
         this.node.appendChild(this.optionPanel.panel);
+        this.hasChanged = true;
+        this.dataUpdate();
     }
     pointerenter(event) {
         super.pointerenter(event);
@@ -52,12 +55,19 @@ export default class BarGraph extends Graph {
         clearInterval(this.tooltipUpdateInterval);
         this.tooltipVLine.style.display = this.tooltipHLine.style.display = 'none';
     }
+    update() {
+        if (this.hasNode && this.hasChanged) {
+            this.hasChanged = false;
+            this.draw(this.ctx);
+        }
+    }
     tooltipUpdate() {
         let rect = this.canvas.getBoundingClientRect();
         this.tooltipVLine.style.left = (this.pointer.x - rect.left) + 'px';
         this.tooltipHLine.style.top = (this.pointer.y - rect.top) + 'px';
     }
     dataUpdate() {
+        this.hasChanged = true;
         localStorage.setItem('graphOptions', JSON.stringify(this.options));
         this.highestValue = Math.max.apply(Math, this.values);
         this.lowestValue = Math.min.apply(Math, this.values);
@@ -81,9 +91,9 @@ export default class BarGraph extends Graph {
         const labelEndSpace = this.options.lineVsBar ?
             Math.max(this.options.fontSize / 2 - dataWidth, 0) : 0;
         this.labelScale = (this.canvas.width - this.valueOffset - labelEndSpace) / (numLabels - (this.options.lineVsBar ? 0.5 : 0));
-        this.draw(this.ctx);
     }
     draw(ctx) {
+        console.debug('bargraph draw');
         const textColor = '#fff';
         ctx.save();
         ctx.fillStyle = "#000";

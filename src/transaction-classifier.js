@@ -261,6 +261,7 @@ const loadTransactions = (csv) => {
         }
         const size = {x: canvasSize.x, y: 500};
         let graph = new BarGraph(title, interestData, interestLabels, size);
+        graphs.push(graph);
         document.body.appendChild(graph.node);
         console.debug(interestCSV);
     };
@@ -455,7 +456,8 @@ const makeBalancesGraph = (accountValues, accountNames, stampRange, balRange) =>
             ({x: a.stampRange.min + i * Date.msDay, y: bal}))
     );
     const title = 'Account Balances Over Time';
-    const graph = new ViewLineGraph(title, values, accountNames, 800, 640, stampRange, balRange);
+    const size = {x: 800, y: 640};
+    const graph = new ViewLineGraph(title, values, accountNames, size, stampRange, balRange);
     graphs.push(graph);
     document.body.appendChild(graph.node);
 };
@@ -664,7 +666,8 @@ const switchClassifier = (type, unique, label) => {
 };
 
 const makeExample = () => {
-    fetch("./json/example-graph.json").then(res => {
+    fetch("./src/json/example-graph.json").then(res => {
+        if (!res.ok) return console.error(res);
         res.json().then(encoded => {
             const root = decodeGraph(encoded);
             makeHPieGraph(root, "Example");

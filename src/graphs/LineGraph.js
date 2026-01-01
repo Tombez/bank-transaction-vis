@@ -1,11 +1,11 @@
 import {Graph} from './Graph.js';
 import {Color} from "../color-utils.js";
-import {dateValToMdy} from '../date-utils.js';
+import {dateToYmd} from '../date-utils.js';
 
 export class LineGraph extends Graph {
     constructor(...args) {
         super(...args);
-        this.axisSpace = {x: 50, y: 50};
+        this.axisSpace = {x: 50, y: 30};
         this.generateColors();
     }
     generateColors() {
@@ -54,7 +54,7 @@ export class LineGraph extends Graph {
             ctx.scale(axisScaler.x, -1 * axisScaler.y * 0.95);
     
             // Draw Data lines:
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 1 + window.devicePixelRatio;
             ctx.globalAlpha = 0.7;
             ctx.lineJoin = 'round';
             for (const line of this.values) {
@@ -81,50 +81,93 @@ export class LineGraph extends Graph {
             }
             ctx.globalAlpha = 1;
             
-            // Draw X Axes:
+            // Draw horizontal lines:
+            ctx.beginPath();
+            ctx.fillStyle = '#000';
+            const yAxisWidth = axisSpace.x / axisScaler.x;
+            ctx.fillRect(-yAxisWidth, 0, yAxisWidth, this.canvas.height);
             ctx.strokeStyle = "white";
             ctx.lineWidth = 2;
             ctx.fillStyle = "white";
             ctx.textAlign = "right";
             ctx.textBaseline = "middle";
-            ctx.setFontSize(16, true);
-            ctx.globalAlpha = 0.4;
+            ctx.setFontSize(22, true);
+            ctx.globalAlpha = 0.2;
             const yStep = 2000;
             ctx.beginPath();
             let y = Math.floor(dataRangeY.min / yStep) * yStep;
             for (; y < dataRangeY.max; y += yStep) {
+                if (y < dataRangeY.min) continue;
                 const drawY = (y - dataRangeY.min) / dataRangeY.diff * ctx.height;
                 ctx.moveTo(0, drawY);
                 ctx.lineTo(ctx.width, drawY);
                 ctx.temp(() => {
                     ctx.globalAlpha = 1;
                     ctx.translate(-5, drawY);
-                    ctx.scale(1.4, -1.4);
+                    ctx.scale(1, -1);
                     ctx.fillText(`$${y/1000|0}k`, 0, 0);
                 });
             }
-
-            // Draw Y Axes:
+            
+            // Draw vertical lines:
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
             const minYear = new Date(dataRangeX.min).getFullYear();
             const maxYear = new Date(dataRangeX.max).getFullYear();
             const yearCount = maxYear - minYear;
-            for (let year = minYear; year <= maxYear; ++year) {
-                const x = +new Date(year, 0, 1);
-                const drawX = (x - dataRangeX.min) / dataRangeX.diff * ctx.width;
+            const margin = 6;
+            const toPixel = x =>
+                (x - dataRangeX.min) / dataRangeX.diff * ctx.width;
+            const drawLabel = (label, x) => {
+                if (x < dataRangeX.min) return;
+                const drawX = toPixel(x);
                 ctx.moveTo(drawX, 0);
                 ctx.lineTo(drawX, ctx.height);
                 ctx.temp(() => {
                     ctx.globalAlpha = 1;
                     ctx.translate(drawX, -5);
-                    ctx.scale(1.4, -1.4);
-                    ctx.fillText(`'${new Date(x).getFullYear()-2000}`, 0, 0);
+                    ctx.scale(1, -1);
+                    ctx.fillText(label, 0, 0);
                 });
+            };
+            const getMonthName = (date, length = 'short') => {
+                return date.toLocaleString('default', { month: length });
+            };
+            const minYearMs = +new Date(minYear, 0, 1);
+            const ax = toPixel(minYearMs);
+            const bx = toPixel(+new Date(minYear + 1, 0, 1));
+            let label = `'${new Date(minYearMs).getFullYear()-2000}`;
+            let textWidth = ctx.measureText(label).width;
+            let spaceBetween = bx - ax - textWidth - margin * 2;
+            textWidth = ctx.measureText('Q3').width;
+            let drawQ3s = (spaceBetween -= textWidth + margin * 2) >= 0;
+            textWidth = ctx.measureText('Q4').width;
+            let drawEvenQs = (spaceBetween -= (textWidth + margin * 2) * 2) >= 0;
+            textWidth = ctx.measureText('May').width;
+            let drawMonths = (spaceBetween -= (textWidth + margin * 2) * 4) >= 0;
+            for (let year = minYear; year <= maxYear; ++year) {
+                const x = +new Date(year, 0, 1);
+                const label = `'${new Date(x).getFullYear()-2000}`;
+                drawLabel(label, x);
+                if (drawQ3s) {
+                    ctx.setFontSize(ctx.fontSize - 2, true);
+                    drawLabel('Q3', +new Date(year, 6, 1));
+                    if (drawEvenQs) {
+                        drawLabel('Q2', +new Date(year, 3, 1));
+                        drawLabel('Q4', +new Date(year, 9, 1));
+                    }
+                    if (drawMonths) {
+                        ctx.setFontSize(ctx.fontSize - 2, true);
+                        for (const month of [1, 2, 4, 5, 7, 8, 10, 11]) {
+                            const date = new Date(year, month, 1);
+                            drawLabel(getMonthName(date), +date);
+                        }
+                    }
+                }
+                ctx.setFontSize(22, true);
             }
             ctx.stroke();
             ctx.globalAlpha = 1;
-            if (yearCount < 3)
     
             // Y baseline:
             ctx.beginPath();
@@ -144,9 +187,6 @@ export class LineGraph extends Graph {
         ctx.setFontSize(26, true);
         ctx.fillText(this.title, x, 20);
         ctx.setFontSize(22, true);
-        ctx.fillText(`min bal: ${dataRangeY.min | 0}, max bal: ${dataRangeY.max | 0}`, x, 40);
-        ctx.fillText(`first transaction date: ${dateValToMdy(dataRangeX.min)}`, x, 60);
-        ctx.fillText(`last transaction date: ${dateValToMdy(dataRangeX.max)}`, x, 80);
         ctx.globalAlpha = 1;
     
         // Draw Graph Key:
@@ -167,15 +207,16 @@ export class LineGraph extends Graph {
 }
 
 export class ViewLineGraph extends LineGraph {
-    constructor(title, values, labels, width, height, dataRangeX, dataRangeY) {
-        super(title, values, labels, width, height);
+    constructor(title, values, labels, size, dataRangeX, dataRangeY) {
+        super(title, values, labels, size);
         this.viewSliderHeight = 40;
         this.ballRadius = this.viewSliderHeight / 6;
-        this.range = {min: this.axisSpace.x, max: width};
+        this.range = {min: this.axisSpace.x, max: size.x};
         this.holding;
         this.dataRangeX = dataRangeX;
         this.dataRangeY = dataRangeY;
         this.hasChanged = true;
+        this.prevPointer = {x: 0, y: 0};
     }
     generateHtml() {
         super.generateHtml();
@@ -191,15 +232,27 @@ export class ViewLineGraph extends LineGraph {
         const width = this.canvas.width - this.axisSpace.x;
         const minPercent = (this.range.min - this.axisSpace.x) / width;
         const maxPercent = (this.range.max - this.axisSpace.x) / width;
-        const min = this.dataRangeX.min + minPercent * this.dataRangeX.diff;
-        const max = this.dataRangeX.min + maxPercent * this.dataRangeX.diff;
+        let min = this.dataRangeX.min + minPercent * this.dataRangeX.diff;
+        let max = this.dataRangeX.min + maxPercent * this.dataRangeX.diff;
         const rangeX = {min, max, diff: max - min};
-        super.draw(ctx, rangeX, this.dataRangeY);
-        this.drawViewBar(ctx, this.dataRangeX, this.dataRangeY);
+        min = Infinity;
+        max = -Infinity;
+        for (const line of this.values) {
+            for (const point of line) {
+                const stamp = point.x;
+                if (stamp < rangeX.min || stamp > rangeX.max) continue;
+                const bal = point.y;
+                min = Math.min(min, bal);
+                max = Math.max(max, bal);
+            }
+        }
+        const rangeY = {min, max, diff: max - min};
+        super.draw(ctx, rangeX, rangeY);
+        this.drawViewBar(ctx, rangeX, rangeY);
     }
-    drawViewBar(ctx) {
+    drawViewBar(ctx, rangeX) {
         ctx.beginPath();
-        ctx.fillStyle = '#423946'
+        ctx.fillStyle = '#423946';
         ctx.globalAlpha = 0.7;
         const leftWidth = this.range.min - this.axisSpace.x;
         const rightWidth = this.canvas.width - this.range.max;
@@ -209,7 +262,7 @@ export class ViewLineGraph extends LineGraph {
         ctx.globalAlpha = 1;
 
         ctx.beginPath();
-        ctx.strokeStyle = ctx.fillStyle = '#423946';
+        ctx.strokeStyle = '#423946';
         ctx.moveTo(this.range.min, this.canvas.height);
         ctx.lineTo(this.range.min, this.ctx.height);
 
@@ -226,15 +279,46 @@ export class ViewLineGraph extends LineGraph {
             ctx.arc(x, midY, r, 0, 2 * Math.PI);
             ctx.fill();
         }
+
+        const leftLabel = dateToYmd(new Date(rangeX.min));
+        const rightLabel = dateToYmd(new Date(rangeX.max));
+        ctx.setFontSize(18, true);
+        ctx.fillStyle = '#5e5164ff';
+        ctx.strokeStyle = '#000';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        const labelWidth = ctx.measureText(rightLabel).width;
+        let x = this.range.max + r;
+        if (labelWidth > rightWidth - r) x = this.range.max - labelWidth - r;
+        ctx.fillText(rightLabel, x, midY);
+        x = this.range.min - labelWidth - r;
+        if (labelWidth > leftWidth - r + this.axisSpace.x)
+            x = this.range.min + r;
+        ctx.fillText(leftLabel, x, midY);
+    }
+    setPointer(event) {
+        this.prevPointer.x = this.pointer.x;
+        this.prevPointer.y = this.pointer.y;
+        if (event.target == this.canvas)
+            super.setPointer(event);
+        else {
+            let rect = this.canvas.getBoundingClientRect();
+            const ratio = this.size.x / rect.width;
+            this.pointer.x = (event.clientX - rect.left) * ratio;
+            this.pointer.y = (event.clientY - rect.top) * ratio;
+        }
     }
     pointerdown(event) {
-        if (event.offsetY >= this.ctx.height) {
-            const pointer = this.setPointer(event);
+        this.setPointer(event);
+        if (this.pointer.y >= this.ctx.height) {
+            const pointer = this.pointer;
             const r = this.ballRadius;
             if (pointer.x >= this.range.min - r && pointer.x <= this.range.min + r)
                 this.holding = 'min';
             else if (pointer.x >= this.range.max - r && pointer.x <= this.range.max + r)
                 this.holding = 'max';
+            else if (pointer.x > this.range.min + r && pointer.x < this.range.max - r)
+                this.holding = 'both';
 
             if (this.holding) {
                 const pointerup = this.pointerup.bind(this);
@@ -243,6 +327,7 @@ export class ViewLineGraph extends LineGraph {
         } else super.pointerdown(event);
     }
     pointerup(event) {
+        super.pointerup(event);
         this.holding = null;
         if (this.moveListener) {
             window.removeEventListener('pointermove', this.moveListener);
@@ -250,19 +335,26 @@ export class ViewLineGraph extends LineGraph {
         }
     }
     pointerleave(event) {
+        super.pointerleave(event);
         if (this.holding && !this.moveListener) {
             this.moveListener = this.pointermove.bind(this);
             window.addEventListener('pointermove', this.moveListener);
         }
     }
     pointermove(event) {
-        this.setPointer(event);
+        super.pointermove(event);
         if (this.holding) {
             const range = this.range;
-            const [min, max] = this.holding == 'min' ?
+            if (this.holding == 'both') {
+                const difference = this.pointer.x - this.prevPointer.x;
+                range.min = Math.min(Math.max(range.min + difference, this.axisSpace.x), range.max - 1);
+                range.max = Math.min(Math.max(range.max + difference, range.min + 1), this.canvas.width);
+            } else {
+                const [min, max] = this.holding == 'min' ?
                 [this.axisSpace.x, range.max - 1] :
                 [range.min + 1, this.canvas.width];
-            range[this.holding] = Math.min(Math.max(this.pointer.x, min), max);
+                range[this.holding] = Math.min(Math.max(this.pointer.x, min), max);
+            }
             this.hasChanged = true;
         }
     }

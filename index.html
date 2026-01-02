@@ -4,11 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="/favicon.png">
+
+    <!-- Google / Search Engine Tags -->
+    <meta itemprop="name" content="Bank Transaction Visualizer" />
+    <meta itemprop="description" content="Categorize transactions and create insightful graphs of spending and cash-flow." />
+    <meta itemprop="image" content="https://tombez.github.io/bank-transaction-vis/assets/meta-image.png" />
+
+    <!-- Facebook Meta Tags -->
+    <meta property="og:url" content="https://tombez.github.io/bank-transaction-vis/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Bank Transaction Visualizer" />
+    <meta property="og:description" content="Categorize transactions and create insightful graphs of spending and cash-flow." />
+    <meta property="og:image" content="https://tombez.github.io/bank-transaction-vis/meta-image.png" />
+
+    <!-- Twitter Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Bank Transaction Visualizer" />
+    <meta name="twitter:description" content="Categorize transactions and create insightful graphs of spending and cash-flow." />
+    <meta name="twitter:image" content="https://tombez.github.io/bank-transaction-vis/meta-image.png" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Emoji:wght@300..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./src/css/index.css">
-    <script src="./src/transaction-classifier.js" type="module"></script>
+    <script src="./src/transaction-classifier.js" type="module" crossorigin="use-credentials"></script>
+    <script>alert('direct js')</script>
 </head>
 <body>
     <header>
@@ -26,5 +46,6 @@
     <button id="add-bank-btn">Add Bank</button>
     <button id="export-btn">Export</button>
     <div id="bank-list"></div>
+    <div id="chart"></div>
 </body>
 </html>

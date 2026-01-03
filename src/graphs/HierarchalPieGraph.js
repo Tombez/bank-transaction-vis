@@ -57,7 +57,6 @@ export default class HierarchyGraph extends Graph {
     }
     pointermove(event) {
         super.pointermove(event);
-        console.debug('pointermove');
         if (this.dragging) {
             this.dragging.drawLoc.x = this.radialPointer.x;
             this.dragging.drawLoc.y = this.radialPointer.y;
@@ -232,6 +231,7 @@ export default class HierarchyGraph extends Graph {
         }
     }
     calculatePieces(pieces, total, startAng, endAng, inrRad, outrRad, colLight = 0.5) { // recursive
+        if (!pieces) return;
         pieces.sort((a,b)=>b.total-a.total);
 
         let sa = startAng,

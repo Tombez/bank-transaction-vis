@@ -1,7 +1,9 @@
 html {
-    --main-bg-color: rgb(27, 27, 37);
+    --main-bg-color: #18191b;
     --main-color: #cad2da;
     --drag-color: #423946;
+    --header-color: #111113;
+    --main-gradient: radial-gradient(rgb(35, 35, 45), rgb(20, 20, 25));
     scrollbar-color: var(--drag-color) var(--main-bg-color);
     scrollbar-width: thin;
 }
@@ -19,7 +21,7 @@ body {
 }
 header {
     font-size: calc(0.5em + 0.5vw);
-    background-color: #111113;
+    background-color: var(--header-color);
     display: flex;
     flex-direction: row;
     justify-content: space-between;
@@ -112,6 +114,7 @@ td, th {
 div:has(>.header) {
     box-shadow: 0 0 5px black;
     margin-top: 5px;
+    background: var(--main-gradient);
 }
 .header {
     display: flex;
@@ -196,6 +199,7 @@ div:has(>.header) {
 }
 *[draggable] {
     cursor: grab;
+    touch-action: pan-y;
 }
 .dragging {
     background-color: var(--drag-color);
@@ -218,6 +222,77 @@ div:has(>.header) {
 .flash-highlight {
   animation: flash 1s linear forwards;
 }
+.tab-bar {
+    justify-content: left;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background-color: var(--header-color);
+}
+.tab-bar > div {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    background-color: var(--main-bg-color);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    max-width: 200px;
+}
+.tab-bar > div:has(input:checked) {
+    background-color: var(--header-color);
+}
+.tab-bar label {
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    padding: 0.2778em;
+    margin: 0;
+    border: 0;
+    
+    cursor: pointer;
+    background-color: var(--header-color);
+    /* 
+    border-bottom-right-radius: 0.8em; */
+}
+.tab-bar > div:has(input:checked) + div:has(input:not(:checked)) {
+    border-bottom-left-radius: 0.8em;
+}
+.tab-bar > div:has(input:not(:checked)) + div:has(input:not(:checked)) {
+    border-left: 1px solid var(--main-bg-color);
+}
+.tab-bar > div:has(input:checked) > label {
+    background-color: var(--main-bg-color);
+    border-top-left-radius: 0.8em;
+    border-top-right-radius: 0.8em;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    color: white;
+    cursor: default;
+    box-shadow: 0px 0px 4px 10px #00000033;
+    outline: 1px solid #777;
+    clip-path: inset(-15px -15px 0px -15px);
+    z-index: 2;
+}
+.tab-content {
+    z-index: 2;
+}
+.tab-bar input[type="radio"] {
+    appearance: none;
+    clip: rect(0 0 0 0); 
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap; 
+    width: 1px;
+    margin: 0;
+}
+
+
+
+
 @media only screen and (max-width: 600px) {
     header {
         font-size: 3vw;

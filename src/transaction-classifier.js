@@ -5,6 +5,7 @@ import {dateToYmd, mdyToDate, isDateStr} from "./date-utils.js";
 import BarGraph from "./graphs/BarGraph.js";
 import {ViewLineGraph} from "./graphs/LineGraph.js";
 import {Bank, Account, TransactionFile} from "./Account.js";
+import {TabBar} from "./TabBar.js";
 Array.prototype.best = function(toScore = a => a, direction = "min") {
     if (!this.length) return null;
     const isBetter = "min" == direction ? (a, b) => a < b : (a, b) => a > b;
@@ -37,7 +38,7 @@ updateloop();
 const removeGraphs = () => {
     for (let cur; cur = graphs.pop();) {
         cur = cur.node || cur.canvas || cur;
-        document.body.removeChild(cur);
+        cur.parentNode.removeChild(cur);
     }
 };
 
@@ -65,7 +66,7 @@ const readBtv = (text) => {
     try {
         const btv = JSON.parse(text)
         const bankObjs = btv.banks;
-        if (btv.classifiers.length) classifiers = btv.classifiers;
+        if (btv.classifiers.length) loadRules(btv.classifiers);
         for (const bankObj of bankObjs) {
             const bank = Bank.decode(bankObj);
             addBank(bank);
@@ -80,7 +81,7 @@ const readBtv = (text) => {
 const exportBtv = () => {
     const btvText = JSON.stringify({
         banks: bankList.map(b => b.encode()),
-        classifiers
+        classifiers: serializeClassifiers(classifiers)
     });
     const filename = 'transactions.btv';
     const blob = new Blob([btvText], {
@@ -109,7 +110,37 @@ const loadRule = (rule, parentCategory) => {
     if (rule.subCategories)
         for (const subRule of rule.subCategories)
             loadRule(subRule, category);
-}
+};
+const serializeClassifiers = (classifiers) => {
+    let categories = new Map();
+    for (const {type, unique, label} of classifiers) {
+        let context = categories;
+        const labels = label.split('/')
+        for (let i = 0; i < labels.length; ++i) {
+            const category = labels[i];
+            let categoryObj = context.get(category);
+            if (!categoryObj) {
+                categoryObj = {category};
+                context.set(category, categoryObj);
+            }
+            context = categoryObj;
+            if (i + 1 < labels.length) {
+                categoryObj.subCategories = context = new Map();
+            }
+        }
+        if (!context.types) context.types = {};
+        if (!context.types[type]) context.types[type] = [];
+        context.types[type].push(unique);
+    }
+    const mapToArrayRecursive = map => {
+        return Array.from(map.values()).map(item => {
+            if (item.subCategories)
+                item.subCategories = mapToArrayRecursive(item.subCategories);
+            return item;
+        });
+    };
+    return mapToArrayRecursive(categories);
+};
 const loadCsvFile = (file, text) => {
     const csv = new CSV(text);
     const firstFile = new TransactionFile(file, csv);
@@ -375,6 +406,7 @@ const makeOptions = (transactions, filterTransactions, minDateT, maxDateT) => {
         let filtered = filterTransactions(year, quar);
 
         const {root, income, ignored} = labelTransactions(filtered);
+        if (!root.transactions.length && !root.children) return;
         makeHPieGraph(root, title);
         makeFlowGraph({root, income}, title);
 
@@ -459,7 +491,7 @@ const makeBalancesGraph = (accountValues, accountNames, stampRange, balRange) =>
     const size = {x: 800, y: 640};
     const graph = new ViewLineGraph(title, values, accountNames, size, stampRange, balRange);
     graphs.push(graph);
-    document.body.appendChild(graph.node);
+    document.querySelector('#chart').appendChild(graph.node);
 };
 
 const encodeGraph = root => {
@@ -564,7 +596,7 @@ const makeHPieGraph = (root, title) => {
     let graph = new HierarchalPieGraph(root, title, canvasSize);
     graphs.push(graph);
     console.debug(title + " root:", graph.root);
-    document.body.appendChild(graph.node);
+    document.querySelector('#chart').appendChild(graph.node);
     return graph;
 };
 const makeFlowGraph = ({root, income}, title) => {
@@ -609,7 +641,7 @@ const makeFlowGraph = ({root, income}, title) => {
 
     let graph = new FlowGraph(layers, title, {x: 1000, y: 600});
     graphs.push(graph);
-    document.body.appendChild(graph.node);
+    document.querySelector('#chart').appendChild(graph.node);
     return graph;
 };
 const fillLayers = (root, layers, index = 0) => { // recursive
@@ -688,6 +720,18 @@ const makeExample = () => {
     });
 };
 const afterPageLoad = event => {
+     fetch("./src/json/default-rules.json").then(res => {
+        if (!res.ok) return console.error(res);
+        res.json().then(rules => {
+            loadRules(rules);
+        });
+    });
+
+    let tabBar = new TabBar();
+    document.querySelector('header').after(tabBar.node);
+    tabBar.addTab('Banks', document.querySelector('#bank-list'));
+    tabBar.addTab('Charts', document.querySelector('#chart'));
+
     textInp = document.querySelector("#transaction-input");
     unlabeledDiv = document.querySelector("#unlabeled");
     addBankBtn = document.querySelector('#add-bank-btn');
@@ -705,7 +749,3 @@ const afterPageLoad = event => {
 
 if (document.readyState !== "loading") afterPageLoad();
 else document.addEventListener("DOMContentLoaded", afterPageLoad);
-
-import('./json/default-rules.json', { with: { type: 'json' } }).then(mod => {
-    loadRules(mod.default);
-}).catch(err => console.error(err));

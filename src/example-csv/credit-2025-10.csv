@@ -1,0 +1,8 @@
+account,date,description,amount
+credit,2025/10/3,gas,-25
+credit,2025/10/10,spending,-400
+credit,2025/10/10,gas,-25
+credit,2025/10/17,gas,-25
+credit,2025/10/20,spending,-400
+credit,2025/10/24,gas,-25
+credit,2025/10/25,deposit transfer from a,900

@@ -32,6 +32,9 @@ header {
     margin: 0;
     margin-left: 30vw;
 }
+.dragging {
+    background: var(--drag-color) !important;
+}
 .center-content {
     display: flex;
     justify-content: center; /* Main Axis */
@@ -111,7 +114,7 @@ td, th {
 #transaction-input, #period {
     margin-top: 8px;
 }
-div:has(>.header) {
+.named {
     box-shadow: 0 0 5px black;
     margin-top: 5px;
     background: var(--main-gradient);
@@ -200,9 +203,6 @@ div:has(>.header) {
 *[draggable] {
     cursor: grab;
     touch-action: pan-y;
-}
-.dragging {
-    background-color: var(--drag-color);
 }
 .drag-over {
     outline: calc(1px + 0.2vw) solid var(--drag-color);

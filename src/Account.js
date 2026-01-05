@@ -97,6 +97,7 @@ const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Bas
     }
     generateHtml() {
         super.generateHtml();
+        this.node.classList.add('named');
         this.header = document.createElement('div');
         this.header.className = 'header flash-highlight';
         setTimeout(() => this.header.classList.remove('flash-highlight'), 1e3);
@@ -450,8 +451,6 @@ export class TransactionFile extends Named {
         this.settings.updateInputs();
 
         // Append Viewer
-        // const oldViewer = this.node.querySelector('.table-content-wrapper');
-        // if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
         const header = this.csv.hasHeader && this.csv.headings;
         let tViewer = new TransactionViewer(header, this.csv.rows);
         this.content.node.appendChild(tViewer.node);

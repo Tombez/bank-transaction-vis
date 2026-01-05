@@ -38,14 +38,17 @@
             </svg>
         </a>
     </header>
-    <label for="transaction-input">
+    <div id="bank-tab">
+        <label for="transaction-input">
         Upload transactions:
         <input id="transaction-input" type="file" accept=".csv,.txt,.btv" multiple title=".csv .txt .btv"/>
-    </label>
-    <button id="add-bank-btn">Add Bank</button>
-    <button id="export-btn">Export</button>
-    <div id="bank-list"></div>
+        </label>
+        <button id="add-bank-btn">Add Bank</button>
+        <button id="export-btn">Export</button>
+        <div id="bank-list"></div>
+    </div>
     <div id="chart"></div>
+    <div id="transactions"></div>
     <script src="./src/debug-iphone.js"></script>
 </body>
 </html>

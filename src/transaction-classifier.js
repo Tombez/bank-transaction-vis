@@ -1,11 +1,12 @@
 import HierarchalPieGraph from "./graphs/HierarchalPieGraph.js";
 import FlowGraph from "./graphs/FlowGraph.js";
-import {CSV, removeCR} from "./CSVTable.js";
+import {CSV} from "./CSVTable.js";
 import {dateToYmd, mdyToDate, isDateStr} from "./date-utils.js";
 import BarGraph from "./graphs/BarGraph.js";
 import {ViewLineGraph} from "./graphs/LineGraph.js";
 import {Bank, Account, TransactionFile} from "./Account.js";
 import {TabBar} from "./TabBar.js";
+import TransactionViewer from "./TransactionViewer.js";
 Array.prototype.best = function(toScore = a => a, direction = "min") {
     if (!this.length) return null;
     const isBetter = "min" == direction ? (a, b) => a < b : (a, b) => a > b;
@@ -227,6 +228,12 @@ const compileTransactions = () => {
         }
     }
     removeGraphs();
+    const tranContainer = document.querySelector('#transactions');
+    const oldViewer = tranContainer.querySelector('.table-content-wrapper');
+    if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
+    const header = simpleCsv.hasHeader && simpleCsv.headings;
+    let tViewer = new TransactionViewer(header, simpleCsv.rows);
+    tranContainer.appendChild(tViewer.node);
     if (simpleCsv && simpleCsv.rows.length) {
         console.debug('loading transactions csv: ', simpleCsv);
         loadTransactions(simpleCsv);
@@ -729,8 +736,9 @@ const afterPageLoad = event => {
 
     let tabBar = new TabBar();
     document.querySelector('header').after(tabBar.node);
-    tabBar.addTab('Banks', document.querySelector('#bank-list'));
+    tabBar.addTab('Banks', document.querySelector('#bank-tab'));
     tabBar.addTab('Charts', document.querySelector('#chart'));
+    tabBar.addTab('Transactions', document.querySelector('#transactions'));
 
     textInp = document.querySelector("#transaction-input");
     unlabeledDiv = document.querySelector("#unlabeled");

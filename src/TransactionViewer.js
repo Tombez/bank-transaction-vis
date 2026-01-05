@@ -5,6 +5,8 @@ export default class TransactionViewer extends LazyHtml {
         super();
         this.header = header;
         this.transactions = transactions;
+        this.itemsPerPage = 10;
+        this.pages = this.transactions / 10;
     }
     generateHtml() {
         super.generateHtml();
@@ -28,5 +30,21 @@ export default class TransactionViewer extends LazyHtml {
             </tbody>
             </table>`;
         this.node.innerHTML = tableHTML;
+        const pageBar = document.createElement('div');
+        pageBar.className = 'page-bar btn-wrapper';
+        pageBar.innerHTML = `
+        <div class="icon icon-left">Previous</div>
+        <div class="page-first">
+            <div class="page-btn">1</div>
+            <div class="ellipsis">..</div>
+        </div>
+        <div class="page-btn">1</div>
+        <div class="page-last">
+            <div class="ellipsis">..</div>
+            <div class="page-btn"></div>
+        </div>
+        <div class="icon icon-right">Next</div>
+        `;
+        this.node.appendChild(pageBar);
     }
 }

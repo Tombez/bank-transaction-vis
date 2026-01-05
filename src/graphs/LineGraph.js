@@ -115,7 +115,7 @@ export class LineGraph extends Graph {
             const minYear = new Date(dataRangeX.min).getFullYear();
             const maxYear = new Date(dataRangeX.max).getFullYear();
             const yearCount = maxYear - minYear;
-            const margin = 6;
+            const margin = 8;
             const toPixel = x =>
                 (x - dataRangeX.min) / dataRangeX.diff * ctx.width;
             const drawLabel = (label, x) => {
@@ -150,14 +150,14 @@ export class LineGraph extends Graph {
                 const label = `'${new Date(x).getFullYear()-2000}`;
                 drawLabel(label, x);
                 if (drawQ3s) {
-                    ctx.setFontSize(ctx.fontSize - 2, true);
+                    ctx.setFontSize(ctx.fontSize - 3, true);
                     drawLabel('Q3', +new Date(year, 6, 1));
                     if (drawEvenQs) {
                         drawLabel('Q2', +new Date(year, 3, 1));
                         drawLabel('Q4', +new Date(year, 9, 1));
                     }
                     if (drawMonths) {
-                        ctx.setFontSize(ctx.fontSize - 2, true);
+                        ctx.setFontSize(ctx.fontSize - 4, true);
                         for (const month of [1, 2, 4, 5, 7, 8, 10, 11]) {
                             const date = new Date(year, month, 1);
                             drawLabel(getMonthName(date), +date);

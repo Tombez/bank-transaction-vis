@@ -229,7 +229,7 @@ const compileTransactions = () => {
     }
     removeGraphs();
     const tranContainer = document.querySelector('#transactions');
-    const oldViewer = tranContainer.querySelector('.table-content-wrapper');
+    const oldViewer = tranContainer.querySelector('.transaction-viewer');
     if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
     const header = simpleCsv.hasHeader && simpleCsv.headings;
     let tViewer = new TransactionViewer(header, simpleCsv.rows);

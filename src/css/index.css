@@ -137,6 +137,22 @@ td, th {
 .btn-wrapper {
     display: flex;
 }
+.page-bar {
+    justify-content: space-around;
+}
+.page-btn {
+    
+}
+.ellipsis {
+    
+}
+.icon.icon-left, .icon.icon-right {
+    width: auto;
+}
+.page-first, .page-last {
+    display: flex;
+    flex-direction: row;
+}
 .icon {
     width: 20px;
     height: 20px;

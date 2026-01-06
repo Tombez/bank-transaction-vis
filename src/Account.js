@@ -32,8 +32,8 @@ const Settings = class extends LazyHtmlMixin(Map) {
             options.map((op, i) => `<option value=${i}>${op}</option>`).join()
         }</select>` : '/>';
         frag.innerHTML = `<label for="${id}">
-            <${tagName} class="setting" id="${id}" type="${type}"${tagEnd}
             ${settingText}
+            <${tagName} class="setting" id="${id}" type="${type}"${tagEnd}
         </label>`;
         this.node.appendChild(frag);
         const input = frag.querySelector('#' + id);
@@ -115,6 +115,7 @@ const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Bas
     }
     generateContentHtml() {
         this.content.node.appendChild(this.settings.node);
+        this.settings.node.hidden = true;
         this.node.appendChild(this.content.node);
     }
     assignTitle(name) {
@@ -199,8 +200,35 @@ const Addable = memoMixin(Base => class extends Base {
     }
     add() {}
 });
+const Editable = memoMixin(Base => class extends Base {
+    constructor(...args) {
+        super(...args);
+    }
+    generateHtml() {
+        super.generateHtml();
+        const editBtn = document.createElement('div');
+        editBtn.className = 'icon icon-edit';
+        this.btnWrapper.appendChild(editBtn);
+        editBtn.addEventListener('click', event => {
+            const deleteBtn = this.node.querySelector('.icon-delete');
+            if (!this.settings.hasNode || this.settings.node.hidden) {
+                const expandBtn = this.header.querySelector('.icon-expand:not(.icon-collapse)');
+                if (expandBtn) expandBtn.click();
+                this.settings.node.hidden = false;
+                editBtn.classList.add('icon-done');
+                if (deleteBtn) deleteBtn.hidden = false;
+            } else {
+                this.settings.node.hidden = true;
+                editBtn.classList.remove('icon-done');
+                if (deleteBtn) deleteBtn.hidden = true;
+            }
+        });
+        const deleteBtn = this.node.querySelector('.icon-delete');
+        if (deleteBtn) deleteBtn.hidden = true;
+    }
+});
 
-const Named = Deletable(NamedMixin());
+const Named = Editable(Deletable(NamedMixin()));
 
 export class Account extends Named {
     constructor(name) {

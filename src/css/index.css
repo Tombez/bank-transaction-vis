@@ -6,6 +6,7 @@ html {
     --main-gradient: radial-gradient(rgb(35, 35, 45), rgb(20, 20, 25));
     scrollbar-color: var(--drag-color) var(--main-bg-color);
     scrollbar-width: thin;
+    color-scheme: dark;
 }
 html, body {
     width: 100%;
@@ -93,6 +94,7 @@ table th {
 table td {
     border-right: 1px solid var(--main-color);
     border-bottom: 1px solid var(--main-color);
+    white-space: nowrap;
 }
     table th:first-child,
     table td:first-child {
@@ -132,26 +134,17 @@ td, th {
     color: orange;
 }
 .header.fully-filled .emoji {
-    color: green;
+    color: #00F300;
 }
 .btn-wrapper {
     display: flex;
 }
 .page-bar {
     justify-content: space-around;
-}
-.page-btn {
-    
+    padding-top: 0.3vh;
 }
 .ellipsis {
-    
-}
-.icon.icon-left, .icon.icon-right {
-    width: auto;
-}
-.page-first, .page-last {
-    display: flex;
-    flex-direction: row;
+    user-select: none;
 }
 .icon {
     width: 20px;
@@ -183,25 +176,53 @@ td, th {
 .icon-collapse {
     background-image: url("../../assets/arrows-collapse.svg");
 }
+.icon-edit {
+    background-image: url("../../assets/pencil.svg");
+}
+.icon-done {
+    background-image: url("../../assets/check-mark.svg");
+}
 .icon-delete  {
     background-image: url("../../assets/trash-bin.svg");
 }
-.icon-add  {
+.icon-add {
     background-image: url("../../assets/plus.svg");
 }
+.icon-left {
+    background-image: url("../../assets/arrow-left.svg");
+}
+.icon-right {
+    background-image: url("../../assets/arrow-left.svg");
+    transform: rotate(180deg);
+}
+.page-btn {
+    min-width: 1em;
+    width: fit-content;
+    text-align: center;
+    padding: 0 0.2em;
+    font-weight: bolder;
+}
+.page-btn, .icon-left, .icon-right {
+    margin: 0;
+}
+.page-selected {
+    border: 1px solid var(--main-color);
+}
 .content {
-    margin-left: 10px;
+    padding-left: 1%;
+    padding-right: 1%;
+    padding-bottom: 0.8%;
 }
 .bank-title, .acc-title, .file-title {
     margin: 0;
     max-width: 80%;
 }
 .setting {
-    margin: 6px 6px 2px 0px;
+    margin: 2px 6px 8px 0px;
 }
 .setting[type=checkbox] {
-    width: 21px;
-    height: 21px;
+    width: 1em;
+    height: 1em;
 }
 .hiddenAnimated {
     height: 0px;
@@ -244,6 +265,9 @@ td, th {
     margin: 0;
     border: 0;
     background-color: var(--header-color);
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 .tab-bar > div {
     flex-grow: 1;
@@ -305,6 +329,11 @@ td, th {
     width: 1px;
     margin: 0;
 }
+label[for="transaction-input"] {
+    display: block;
+    padding-top: 1vw;
+    padding-bottom: 1vw;
+}
 
 
 
@@ -317,10 +346,9 @@ td, th {
         margin-left: 4vw;
     }
     .content {
-        margin-left: 1%;
-        margin-right: 1%;
+        padding-bottom: 0.5%;
     }
-    .icon {
+    .header .icon {
         margin-left: 8px;
     }
     .table-content-wrapper {

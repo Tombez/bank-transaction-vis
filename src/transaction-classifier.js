@@ -228,6 +228,7 @@ const compileTransactions = () => {
         }
     }
     removeGraphs();
+    if (!simpleCsv) return;
     const tranContainer = document.querySelector('#transactions');
     const oldViewer = tranContainer.querySelector('.transaction-viewer');
     if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
@@ -307,7 +308,7 @@ const loadTransactions = (csv) => {
     // addGraphForCategory('Food', 'Quarterly Food Spending', true);
     // addGraphForCategory('Fuel', 'Quarterly Fuel Spending', true);
     
-    makeOptions(transactions, filterTransactions, minDateT, maxDateT);
+    // updateOptions(transactions, filterTransactions, minDateT, maxDateT);
 
 
     let accounts = calculateDailyBalances(transactions);
@@ -332,116 +333,7 @@ const loadTransactions = (csv) => {
     makeBalancesGraph(accountValues, accountNames, stampRange, balRange);
 
     // Make Net Worth Graph:
-    {
-        const totalDailyBalance = [];
-        for (let d = stampRange.min, i = 0; d < stampRange.max; d += Date.msDay, ++i) {
-            let total = 0;
-            for (const account of accounts.values()) {
-                if (account.stampRange.min <= d) {
-                    let index = Math.round((d - account.stampRange.min) / Date.msDay);
-                    if (d > account.stampRange.max)
-                        index = account.dailyBalance.length - 1;
-                    total += account.dailyBalance[index];
-                }
-            }
-            totalDailyBalance[i] = total;
-        }
-
-        let dataPoints = [];
-        const labels = [];
-        let prevYear = -Infinity;
-        for (let i = 0, len = totalDailyBalance.length; i < len; ++i) {
-            const bal = totalDailyBalance[i];
-            const stamp = stampRange.min + i * Date.msDay;
-            const date = new Date(stamp);
-            const year = +date.getFullYear();
-            let label = "";
-            const isFirstOrLast = prevYear == -Infinity || i + 1 == len;
-            if (year > prevYear || isFirstOrLast) {
-                prevYear = year;
-                label = isFirstOrLast ? dateToYmd(date) : date.getFullYear();
-            }
-            labels.push(label);
-
-            const x = (stamp - stampRange.min) / stampRange.diff;
-            const y = (bal - balRange.min) / balRange.diff;
-            dataPoints.push({x, y});
-        }
-
-        const size = {x: canvasSize.x, y: 400};
-        let netWorthGraph = new BarGraph("Net Worth Over Time", totalDailyBalance, labels, size);
-        console.debug("net worth graph", netWorthGraph);
-        window.netWorthGraph = netWorthGraph;
-        graphs.push(netWorthGraph);
-        document.body.appendChild(netWorthGraph.node);
-    }
-};
-const makeOptions = (transactions, filterTransactions, minDateT, maxDateT) => {
-    // Make options:
-    let options = "";
-    const addOption = (value, text) =>
-        (options += `<option value="${value}">${text}</option>\n`);
-    let year = minDateT.year, quarter = minDateT.quarter;
-    while (year * 4 + quarter <= maxDateT.year * 4 + maxDateT.quarter) {
-        addOption(`${year},${quarter}`, `${year} Q${quarter + 1}`);
-        if (year == maxDateT.year && quarter == maxDateT.quarter)
-            addOption(year, `${year} Ending ${maxDateT.month}/${maxDateT.day}`);
-        else if (quarter == 3)
-            addOption(year, year);
-        year += quarter == 3;
-        quarter = (quarter + 1) % 4;
-    }
-    options += `<option value="all">All Time</option>`;
-    options = options.split("\n").reverse().join("\n");
-
-    let settingsDiv = document.createElement("div");
-    settingsDiv.innerHTML = `
-        <label for="period">Choose a time period:</label>
-        <select id="period">${options}</select>
-        <label for="duplicates">Filter repeat descriptions:</label>
-        <input type="checkbox" id="duplicates" name="duplicates" checked />`;
-    let transElm = document.querySelector("#transactions");
-    document.body.insertBefore(settingsDiv, transElm);
-    const duplicatesBox = document.querySelector("#duplicates");
-    const periodSelect = document.querySelector("#period");
-    const changePeriod = () => {
-        const periodValue = periodSelect.value;
-        removeGraphs();
-
-        let [year, quar] = periodValue.split(",").map(s => +s);
-        let title = periodSelect.selectedOptions[0].text;
-        let filtered = filterTransactions(year, quar);
-
-        const {root, income, ignored} = labelTransactions(filtered);
-        if (!root.transactions.length && !root.children) return;
-        makeHPieGraph(root, title);
-        makeFlowGraph({root, income}, title);
-
-        // Filter duplicates
-        if (duplicatesBox.checked) {
-            let descs = new Set();
-            filtered = filtered.filter(t => {
-                const isDup = descs.has(t.desc);
-                if (!isDup) descs.add(t.desc);
-                return !isDup;
-            });
-        }
-
-        // Stats:
-        let uniqueDescs = [...new Set(filtered.map(t => t.desc))].length;
-        let unlabeled = filtered.filter(t => !t.labels[0]).length;
-        let statsElm = document.querySelector("#transaction-stats");
-        if (statsElm) {
-            statsElm.innerText = `${transactions.length} total transactions.\n`;
-            statsElm.innerText += `Showing ${filtered.length} transactions.\n`;
-            statsElm.innerText += `${uniqueDescs} unique descriptions.\n`;
-            statsElm.innerText += `${unlabeled} transactions without label.`;
-        }
-    };
-    periodSelect.addEventListener("change", changePeriod);
-    duplicatesBox.addEventListener("change", changePeriod);
-
-    changePeriod();
+    makeNetWorthGraph(accounts, stampRange, balRange);
 };
 const calculateDailyBalances = (transactions) => {
     // Account Balances:
@@ -499,6 +391,49 @@ const makeBalancesGraph = (accountValues, accountNames, stampRange, balRange) =>
     const graph = new ViewLineGraph(title, values, accountNames, size, stampRange, balRange);
     graphs.push(graph);
     document.querySelector('#chart').appendChild(graph.node);
+};
+const makeNetWorthGraph = (accounts, stampRange, balRange) => {
+    const totalDailyBalance = [];
+    for (let d = stampRange.min, i = 0; d < stampRange.max; d += Date.msDay, ++i) {
+        let total = 0;
+        for (const account of accounts.values()) {
+            if (account.stampRange.min <= d) {
+                let index = Math.round((d - account.stampRange.min) / Date.msDay);
+                if (d > account.stampRange.max)
+                    index = account.dailyBalance.length - 1;
+                total += account.dailyBalance[index];
+            }
+        }
+        totalDailyBalance[i] = total;
+    }
+
+    let dataPoints = [];
+    const labels = [];
+    let prevYear = -Infinity;
+    for (let i = 0, len = totalDailyBalance.length; i < len; ++i) {
+        const bal = totalDailyBalance[i];
+        const stamp = stampRange.min + i * Date.msDay;
+        const date = new Date(stamp);
+        const year = +date.getFullYear();
+        let label = "";
+        const isFirstOrLast = prevYear == -Infinity || i + 1 == len;
+        if (year > prevYear || isFirstOrLast) {
+            prevYear = year;
+            label = isFirstOrLast ? dateToYmd(date) : date.getFullYear();
+        }
+        labels.push(label);
+
+        const x = (stamp - stampRange.min) / stampRange.diff;
+        const y = (bal - balRange.min) / balRange.diff;
+        dataPoints.push({x, y});
+    }
+
+    const size = {x: canvasSize.x, y: 400};
+    let netWorthGraph = new BarGraph("Net Worth Over Time", totalDailyBalance, labels, size);
+    console.debug("net worth graph", netWorthGraph);
+    window.netWorthGraph = netWorthGraph;
+    graphs.push(netWorthGraph);
+    document.querySelector('#chart').appendChild(netWorthGraph.node);
 };
 
 const encodeGraph = root => {

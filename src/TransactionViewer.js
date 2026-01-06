@@ -5,7 +5,7 @@ export default class TransactionViewer extends LazyHtml {
         super();
         this.header = header;
         this.transactions = transactions;
-        this.itemsPerPage = 3;
+        this.itemsPerPage = 8;
         this.pageCount = Math.ceil(this.transactions.length / this.itemsPerPage);
         this.page = 0;
     }
@@ -34,34 +34,47 @@ export default class TransactionViewer extends LazyHtml {
         const pageBar = document.createElement('div');
         pageBar.className = 'page-bar btn-wrapper';
         pageBar.innerHTML = `
-        <div class="icon icon-left">Previous</div>
-        <div class="page-first">
-            <div class="page-btn">1</div>
-        </div>
-        <div class="ellipsis">..</div>
-        <div class="page-btn">1</div>
-        <div class="ellipsis">..</div>
-        <div class="page-last">
-            <div class="page-btn">${this.pageCount}</div>
-        </div>
-        <div class="icon icon-right">Next</div>
+        <div class="icon icon-left"></div>
+        <div class="icon page-btn page-first">1</div>
+        <div class="ellipsis page-first">..</div>
+        <div class="icon page-btn page-selected">1</div>
+        <div class="ellipsis page-last">..</div>
+        <div class="icon page-btn page-last">${this.pageCount}</div>
+        <div class="icon icon-right"></div>
+        <div class="page-items"></div>
         `;
         this.node.appendChild(pageBar);
         this.node.querySelector('.icon-left').addEventListener('click', () => {
             if (this.page > 0) {
-                this.displayPage(this.page--);
+                this.displayPage(--this.page);
             }
         });
         this.node.querySelector('.icon-right').addEventListener('click', () => {
             if (this.page + 1 < this.pageCount) {
-                this.displayPage(this.page++);
+                this.displayPage(++this.page);
             }
         });
-        this.displayPage(1);
+        this.node.querySelector('.page-first').addEventListener('click', () =>
+            this.displayPage(this.page = 0));
+        this.node.querySelector('.page-btn.page-last').addEventListener('click', () =>
+            this.displayPage(this.page = this.pageCount - 1));
+        this.displayPage(this.page);
     }
     displayPage(number) {
         if (number > this.pageCount - 1) number = this.pageCount - 1;
         if (number < 0) number = 0;
+
+        this.node.querySelector('.page-selected').innerText = number + 1;
+        const pageItems = this.node.querySelector('.page-items');
+        const itemStart = this.page * this.itemsPerPage + 1;
+        let itemEnd = itemStart - 1 + this.itemsPerPage;
+        itemEnd = Math.min(itemEnd, this.transactions.length);
+        pageItems.innerText = `Items ${itemStart}-${itemEnd} of ${this.transactions.length}`;
+
+        for (const node of [...this.node.querySelectorAll('.page-first')])
+            node.hidden = number == 0;
+        for (const node of [...this.node.querySelectorAll('.page-last')])
+            node.hidden = number == this.pageCount - 1;
 
         const startIndex = number * this.itemsPerPage;
         let endIndex = startIndex + this.itemsPerPage;
@@ -78,3 +91,73 @@ export default class TransactionViewer extends LazyHtml {
         tbody.innerHTML = rowsText;
     }
 }
+const updateOptions = (transactions, filterTransactions, minDateT, maxDateT) => {
+    if (!true) {
+        // Make options:
+    }
+    let options = "";
+    const addOption = (value, text) =>
+        (options += `<option value="${value}">${text}</option>\n`);
+    let year = minDateT.year, quarter = minDateT.quarter;
+    while (year * 4 + quarter <= maxDateT.year * 4 + maxDateT.quarter) {
+        addOption(`${year},${quarter}`, `${year} Q${quarter + 1}`);
+        if (year == maxDateT.year && quarter == maxDateT.quarter)
+            addOption(year, `${year} Ending ${maxDateT.month}/${maxDateT.day}`);
+        else if (quarter == 3)
+            addOption(year, year);
+        year += quarter == 3;
+        quarter = (quarter + 1) % 4;
+    }
+    options += `<option value="all">All Time</option>`;
+    options = options.split("\n").reverse().join("\n");
+
+    let settingsDiv = document.createElement("div");
+    let input = settingsDiv.querySelector('input');
+    settingsDiv.innerHTML = `
+        <label for="period">Choose a time period:</label>
+        <select id="period">${options}</select>
+        <label for="duplicates">Filter repeat descriptions:</label>
+        <input type="checkbox" id="duplicates" name="duplicates" checked />`;
+    let transElm = document.querySelector("#transactions");
+    // document.body.insertBefore(settingsDiv, transElm);
+    const duplicatesBox = settingsDiv.querySelector("#duplicates");
+    const periodSelect = settingsDiv.querySelector("#period");
+    const changePeriod = () => {
+        const periodValue = periodSelect.value;
+        removeGraphs();
+
+        let [year, quar] = periodValue.split(",").map(s => +s);
+        let title = periodSelect.selectedOptions[0].text;
+        let filtered = filterTransactions(year, quar);
+
+        const {root, income, ignored} = labelTransactions(filtered);
+        if (!root.transactions.length && !root.children) return;
+        makeHPieGraph(root, title);
+        makeFlowGraph({root, income}, title);
+
+        // Filter duplicates
+        if (duplicatesBox.checked) {
+            let descs = new Set();
+            filtered = filtered.filter(t => {
+                const isDup = descs.has(t.desc);
+                if (!isDup) descs.add(t.desc);
+                return !isDup;
+            });
+        }
+
+        // Stats:
+        let uniqueDescs = [...new Set(filtered.map(t => t.desc))].length;
+        let unlabeled = filtered.filter(t => !t.labels[0]).length;
+        let statsElm = document.querySelector("#transaction-stats");
+        if (statsElm) {
+            statsElm.innerText = `${transactions.length} total transactions.\n`;
+            statsElm.innerText += `Showing ${filtered.length} transactions.\n`;
+            statsElm.innerText += `${uniqueDescs} unique descriptions.\n`;
+            statsElm.innerText += `${unlabeled} transactions without label.`;
+        }
+    };
+    periodSelect.addEventListener("change", changePeriod);
+    duplicatesBox.addEventListener("change", changePeriod);
+
+    changePeriod();
+};

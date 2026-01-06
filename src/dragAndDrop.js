@@ -29,6 +29,8 @@ export const makeDraggable = (node, data, handle = node) => {
     // handlers:
     const dragstart = event => {
         console.debug('dragstart isTrusted ', event.isTrusted);
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
         setTimeout(() => node.classList?.add('dragging'), 0);
         drug = data;
         event.dataTransfer.effectAllowed = 'move';

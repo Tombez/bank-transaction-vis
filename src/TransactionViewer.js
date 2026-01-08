@@ -34,13 +34,13 @@ export default class TransactionViewer extends LazyHtml {
         const pageBar = document.createElement('div');
         pageBar.className = 'page-bar btn-wrapper';
         pageBar.innerHTML = `
-        <div class="icon icon-left"></div>
+        <div class="icon icon-left" aria-label="previous" title="previous"></div>
         <div class="icon page-btn page-first">1</div>
         <div class="ellipsis page-first">..</div>
         <div class="icon page-btn page-selected">1</div>
         <div class="ellipsis page-last">..</div>
         <div class="icon page-btn page-last">${this.pageCount}</div>
-        <div class="icon icon-right"></div>
+        <div class="icon icon-right" aria-label="next" title="next"></div>
         <div class="page-items"></div>
         `;
         this.node.appendChild(pageBar);
@@ -69,12 +69,12 @@ export default class TransactionViewer extends LazyHtml {
         const itemStart = this.page * this.itemsPerPage + 1;
         let itemEnd = itemStart - 1 + this.itemsPerPage;
         itemEnd = Math.min(itemEnd, this.transactions.length);
-        pageItems.innerText = `Items ${itemStart}-${itemEnd} of ${this.transactions.length}`;
+        pageItems.innerText = `Items ${itemStart}–${itemEnd} of ${this.transactions.length}`;
 
         for (const node of [...this.node.querySelectorAll('.page-first')])
-            node.hidden = number == 0;
+            node.style.display = number == 0 ? 'none' : '';
         for (const node of [...this.node.querySelectorAll('.page-last')])
-            node.hidden = number == this.pageCount - 1;
+            node.style.display = number == this.pageCount - 1 ? 'none' : '';
 
         const startIndex = number * this.itemsPerPage;
         let endIndex = startIndex + this.itemsPerPage;

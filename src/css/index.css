@@ -94,7 +94,6 @@ table th {
 table td {
     border-right: 1px solid var(--main-color);
     border-bottom: 1px solid var(--main-color);
-    white-space: nowrap;
 }
     table th:first-child,
     table td:first-child {
@@ -102,6 +101,7 @@ table td {
 }
 td, th {
     padding-left: 3px;
+    white-space: nowrap;
 }
 .table-content-wrapper {
     overflow-y: auto;
@@ -140,19 +140,20 @@ td, th {
     display: flex;
 }
 .page-bar {
-    justify-content: space-around;
+    justify-content: left;
     padding-top: 0.3vh;
+    flex-wrap: wrap;
 }
 .ellipsis {
     user-select: none;
 }
 .icon {
-    width: 20px;
-    height: 20px;
+    width: 1.2em;
+    height: 1.2em;
     margin-left: 25px;
     fill: rgb(240, 246, 252);
     background-color: rgb(14, 14, 15);
-    border-radius: 25%;
+    border-radius: 0.3em;
     box-shadow: 0 0 4px black;
     user-select: none;
     cursor: pointer;
@@ -198,12 +199,14 @@ td, th {
 .page-btn {
     min-width: 1em;
     width: fit-content;
-    text-align: center;
-    padding: 0 0.2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.1em;
     font-weight: bolder;
 }
 .page-btn, .icon-left, .icon-right {
-    margin: 0;
+    margin: 0 0.25em;
 }
 .page-selected {
     border: 1px solid var(--main-color);
@@ -226,6 +229,9 @@ td, th {
 }
 .hiddenAnimated {
     height: 0px;
+}
+#export-btn {
+    margin: 8px;
 }
 #bank-list {
     margin-left: 8px;
@@ -331,7 +337,7 @@ td, th {
 }
 label[for="transaction-input"] {
     display: block;
-    padding-top: 1vw;
+    padding-top: 1vh;
     padding-bottom: 1vw;
 }
 

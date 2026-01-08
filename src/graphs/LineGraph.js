@@ -198,6 +198,7 @@ export class LineGraph extends Graph {
         for (let i = 0; i < this.values.length; ++i) {
             const line = this.values[i];
             const label = this.labels[i];
+            if (!line.inRange) continue;
             ctx.fillStyle = "white";
             ctx.fillText(label, ctx.width - 30, y += keyFontSize + 4);
             ctx.fillStyle = line.color;
@@ -238,13 +239,16 @@ export class ViewLineGraph extends LineGraph {
         min = Infinity;
         max = -Infinity;
         for (const line of this.values) {
+            let oneInRange = false;
             for (const point of line) {
                 const stamp = point.x;
                 if (stamp < rangeX.min || stamp > rangeX.max) continue;
+                oneInRange = true;
                 const bal = point.y;
                 min = Math.min(min, bal);
                 max = Math.max(max, bal);
             }
+            line.inRange = oneInRange;
         }
         const rangeY = {min, max, diff: max - min};
         super.draw(ctx, rangeX, rangeY);

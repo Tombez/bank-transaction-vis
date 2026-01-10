@@ -3,7 +3,7 @@ import FlowGraph from "./graphs/FlowGraph.js";
 import {CSV} from "./CSVTable.js";
 import {dateToYmd, mdyToDate, isDateStr} from "./date-utils.js";
 import BarGraph from "./graphs/BarGraph.js";
-import {ViewLineGraph} from "./graphs/LineGraph.js";
+import {ViewLineGraph} from "./graphs/ViewLineGraph.js";
 import {Bank, Account, TransactionFile} from "./Account.js";
 import {TabBar} from "./TabBar.js";
 import TransactionViewer from "./TransactionViewer.js";

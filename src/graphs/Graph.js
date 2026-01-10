@@ -39,6 +39,12 @@ export class Graph extends LazyHtml {
 
         this.attachListeners();
     }
+    update() {
+        if (this.hasChanged) {
+            this.hasChanged = false;
+            this.draw();
+        }
+    }
     setPointer(event) {
         let rect = event.target.getBoundingClientRect();
         const ratio = this.size.x / rect.width;

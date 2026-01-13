@@ -1,12 +1,13 @@
 import HierarchalPieGraph from "./graphs/HierarchalPieGraph.js";
 import FlowGraph from "./graphs/FlowGraph.js";
 import {CSV} from "./CSVTable.js";
-import {dateToYmd, mdyToDate, isDateStr} from "./date-utils.js";
+import {dateToYmd} from "./date-utils.js";
 import BarGraph from "./graphs/BarGraph.js";
 import {ViewLineGraph} from "./graphs/ViewLineGraph.js";
 import {Bank, Account, TransactionFile} from "./Account.js";
 import {TabBar} from "./TabBar.js";
 import TransactionViewer from "./TransactionViewer.js";
+import Vec2 from './Vec2.js';
 Array.prototype.best = function(toScore = a => a, direction = "min") {
     if (!this.length) return null;
     const isBetter = "min" == direction ? (a, b) => a < b : (a, b) => a > b;
@@ -216,60 +217,68 @@ const addTransactionFile = (tranFile) => {
     account.addTransactionFile(tranFile);
 };
 const compileTransactions = () => {
-    let simpleCsv;
+    let transactions = [];
+    let rows = [];
     for (const bank of bankList) {
         for (const account of bank.accounts) {
+            account.transactions = [];
             for (const tranFile of account.transactionFiles) {
                 if (!tranFile.isFullyFilled) continue;
-                const cur = tranFile.getSimplifiedCsv(account.name);
-                if (!simpleCsv) simpleCsv = cur;
-                else simpleCsv.append(cur);
+                const fileTransactions = tranFile.getTransactions();
+                for (const t of fileTransactions) {
+                    transactions.push(t);
+                    account.transactions.push(t);
+                    rows.push([
+                        bank.name, account.name, t.date, t.desc, t.amount]);
+                }
             }
         }
     }
+    transactions.sort((a, b) => a.timestamp - b.timestamp);
     removeGraphs();
-    if (!simpleCsv) return;
+
     const tranContainer = document.querySelector('#transactions');
     const oldViewer = tranContainer.querySelector('.transaction-viewer');
     if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
-    const header = simpleCsv.hasHeader && simpleCsv.headings;
-    let tViewer = new TransactionViewer(header, simpleCsv.rows);
+    const header = 'Bank,Account,Date,Description,Amount'.split(',');
+    let tViewer = new TransactionViewer(header, rows);
     tranContainer.appendChild(tViewer.node);
-    if (simpleCsv && simpleCsv.rows.length) {
-        console.debug('loading transactions csv: ', simpleCsv);
-        loadTransactions(simpleCsv);
-    }
+    
+    const accounts = bankList.map(bank => bank.accounts).flat();
+    if (!accounts.length) return;
 
+    loadTransactions(transactions);
+    calculateDailyBalances(accounts);
+    
+    const stampRange = {
+        min: accounts.best(({stampRange: {min}}) => min).stampRange.min,
+        max: accounts.best(({stampRange: {max}}) => max, "max").stampRange.max
+    };
+    stampRange.diff = stampRange.max - stampRange.min;
+    
+    const balRange = {
+        min: accounts.best(({balRange: {min}}) => min).balRange.min,
+        max: accounts.best(({balRange: {max}}) => max, "max").balRange.max
+    };
+    balRange.diff = balRange.max - balRange.min;
+    
+    
+    makeBalancesGraph(accounts, stampRange, balRange);
+    makeNetWorthGraph(accounts, stampRange, balRange);
 };
-const loadTransactions = (csv) => {
-    let transactions = csv.rows.map(row => ({
-        cols: row
-    }));
-    let headings = csv.headings;
-    let fieldIndices = {};
-    for (let i = 0; i < headings.length; ++i) {
-        let colName = headings[i];
-        fieldIndices[colName] = i;
-    }
-    const dateField = fieldIndices["Transaction Date"];
-    const descField = fieldIndices["Description"];
-    const amountField = fieldIndices["Amount"];
+const loadTransactions = (transactions) => {
+    console.debug('transactions: ', transactions);
+    
     transactions.forEach(t => {
-        t.date = t.cols[dateField];
-        t.desc = t.cols[descField];
-        t.amount = +t.cols[amountField];
         if (isNaN(t.amount)) debugger;
     });
 
     for (const t of transactions) {
-        let [m,d,y] = t.date.split("/");
-        if (!isDateStr(t.date))
-            console.error("invalid date: ", t.date);
-        t.timestamp = +new Date(y,m-1,d);
-        t.year = +y;
-        t.quarter = (m - 1) / 3 | 0;
-        t.month = +m;
-        t.day = +d;
+        t.timestamp = +t.date;
+        t.year = t.date.getFullYear();
+        t.month = t.date.getMonth + 1;
+        t.quarter = (t.month - 1) / 3 | 0;
+        t.day = t.date.getDate();
     }
     const filterCustom = (start, end) =>
         transactions.filter(t => t.timestamp >= start && t.timestamp < end);
@@ -309,55 +318,36 @@ const loadTransactions = (csv) => {
     // addGraphForCategory('Fuel', 'Quarterly Fuel Spending', true);
     
     // updateOptions(transactions, filterTransactions, minDateT, maxDateT);
-
-
-    let accounts = calculateDailyBalances(transactions);
-    if (!accounts.size) return;
-
-    const accountValues = Array.from(accounts.values());
-    const accountNames = Array.from(accounts.keys());
-    
-    const stampRange = {
-        min: accountValues.best(({stampRange: {min}}) => min).stampRange.min,
-        max: accountValues.best(({stampRange: {max}}) => max, "max").stampRange.max
-    };
-    stampRange.diff = stampRange.max - stampRange.min;
-    
-    const balRange = {
-        min: accountValues.best(({balRange: {min}}) => min).balRange.min,
-        max: accountValues.best(({balRange: {max}}) => max, "max").balRange.max
-    };
-    balRange.diff = balRange.max - balRange.min;
-    
-    
-    makeBalancesGraph(accountValues, accountNames, stampRange, balRange);
-
-    // Make Net Worth Graph:
-    makeNetWorthGraph(accounts, stampRange, balRange);
 };
-const calculateDailyBalances = (transactions) => {
-    // Account Balances:
-    let nonSweepTrans = transactions.filter(t => !t.desc.includes("Sweep") || t.desc == "Cash Sweep Interest");
-    nonSweepTrans = nonSweepTrans.filter(t => !t.desc.match(/(Buy|Sell) [A-Z]{3,4}/));
-    nonSweepTrans = nonSweepTrans.filter(t => !t.desc.match(/Transfer Received from Another Account [A-Z]{3,4}/));
-    let accounts = new Map();
-    for (const t of nonSweepTrans) {
-        const accountName = t.cols[0];
-        let account = accounts.get(accountName);
-        if (!account) accounts.set(accountName, account = {
-            transactions: [],
-            dailyChange: new Map()
-        });
-        account.transactions.push(t);
-        let date = t.cols[2] || t.cols[1];
-        let timestamp = +mdyToDate(date);
-        let bal = account.dailyChange.get(timestamp) || 0;
-        account.dailyChange.set(timestamp, bal + t.amount);
+const createBalLine = (transactions) => {
+    if (!transactions.length) return [];
+    transactions.sort((a, b) => a.timestamp - b.timestamp);
+    
+    let line = [];
+    let bal = 0;
+    for (let i = 0; i < transactions.length;) {
+        let startIndex = i;
+        const stamp = transactions[startIndex].timestamp;
+        const prevBal = bal;
+        for (; i < transactions.length &&
+            transactions[i].timestamp == stamp; ++i)
+                bal += transactions[i].amount;
+        
+        line.push(new Vec2(stamp, prevBal));
+        line.push(new Vec2(stamp, bal));
     }
-    for (const [accountName, account] of accounts.entries()) {
-        let {dailyChange} = account;
-        const stamps = Array.from(dailyChange.keys());
+    return line;
+};
+const calculateDailyBalances = (accounts) => {
+    for (const account of accounts) {
+        const dailyChange = account.dailyChange = new Map();
+        for (const t of account.transactions) {
+            let bal = dailyChange.get(t.timestamp) || 0;
+            dailyChange.set(t.timestamp, bal + t.amount);
+        }
+
         const dailyChangeEntries = Array.from(dailyChange.entries());
+        const stamps = Array.from(dailyChange.keys());
         const stamp = account.stampRange =
             {min: stamps.best(), max: stamps.best(a => a, "max")};
         let dailyBalance = account.dailyBalance = [];
@@ -372,23 +362,20 @@ const calculateDailyBalances = (transactions) => {
         }
         const balRange = account.balRange =
             {min: dailyBalance.best(), max: dailyBalance.best(a => a, "max")};
-        if (!accountName.includes("Credit") && balRange.min < 0) {
+        if (!account.name.includes("Credit") && balRange.min < 0) {
             for (let i = 0; i < dailyBalance.length; ++i)
                 dailyBalance[i] -= balRange.min;
             balRange.max -= balRange.min;
             balRange.min -= balRange.min;
         }
     }
-    return accounts;
 };
-const makeBalancesGraph = (accountValues, accountNames, stampRange, balRange) => {
-    const values = accountValues.map(a =>
-        a.dailyBalance.map((bal, i) => 
-            ({x: a.stampRange.min + i * Date.msDay, y: bal}))
-    );
+const makeBalancesGraph = (accounts, stampRange, balRange) => {
+    const values = accounts.map(a => createBalLine(a.transactions));
     const title = 'Account Balances Over Time';
     const size = {x: 800, y: 640};
-    const graph = new ViewLineGraph(title, values, accountNames, size, stampRange, balRange);
+    const labels = accounts.map(a => `${a.bank.name} ${a.name}`);
+    const graph = new ViewLineGraph(title, values, labels, size, stampRange, balRange);
     graphs.push(graph);
     document.querySelector('#chart').appendChild(graph.node);
 };

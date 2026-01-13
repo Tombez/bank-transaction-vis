@@ -419,6 +419,16 @@ export class Bank extends Addable(Named) {
     }
 }
 
+class Transaction {
+    constructor(date, desc, amount, row, transactionFile) {
+        this.date = fromDateString(date);
+        this.desc = desc;
+        this.amount = +amount;
+        this.row = row;
+        this.transactionFile = transactionFile;
+    }
+}
+
 const colSearches = [
     [/^((transaction|trade|post(ed|ing)|effective|booking) )?date( created)?$/i, 'date'],
     [/^(transaction )?description$/i, 'description'],
@@ -552,6 +562,24 @@ export class TransactionFile extends Named {
             row[dateCol] = dateToMdy(fromDateString(row[dateCol]));
         }
         return simpleCsv;
+    }
+    getTransactions() {
+        const transactions = [];
+        const indCol = this.settings.get('cdIndicator');
+        for (const row of this.csv.rows) {
+            const date = row[this.settings.get('date')];
+            const desc = row[this.settings.get('description')];
+            let debit = sanitize$Text(row[this.settings.get('debit')]);
+            const credit = sanitize$Text(row[this.settings.get('credit')]);
+            const oneCol = this.settings.get('debit') === this.settings.get('credit');
+            const isDebit = this.settings.get('hasCdIndicator') && indCol > -1 &&
+                /debit/i.test(row[indCol]) || !oneCol && debit;
+            if (isDebit && !debit.startsWith('-'))
+                debit = '-' + debit;
+            const amount = isDebit ? debit : credit;
+            transactions.push(new Transaction(date, desc, amount, row, this));
+        }
+        return transactions;
     }
     encode() {
         return {

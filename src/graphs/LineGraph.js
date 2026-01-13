@@ -221,6 +221,7 @@ export class LineGraph extends Graph {
         ctx.textBaseline = 'middle';
         let y = 0;
         for (const [line, label] of keyItems) {
+            label.rect = null;
             if (!line.inRange) continue;
             const colorInactive = '#999';
             ctx.fillStyle = label.active ? '#fff' : colorInactive;
@@ -253,7 +254,7 @@ export class LineGraph extends Graph {
                 const pointInside = (p, rect) =>
                     p.x >= rect.left && p.x <= rect.right &&
                     p.y >= rect.top  && p.y <= rect.bottom;
-                if (pointInside(this.pointer, label.rect)) {
+                if (label.rect && pointInside(this.pointer, label.rect)) {
                     toggledLabel = true;
                     label.active = !label.active;
                     this.changed = true;

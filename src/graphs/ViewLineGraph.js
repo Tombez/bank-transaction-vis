@@ -27,6 +27,7 @@ export class ViewLineGraph extends LineGraph {
         min = Infinity;
         max = -Infinity;
         for (const line of this.values) {
+            if (!line.label.active) continue;
             let oneInRange = false;
             for (const point of line) {
                 const stamp = point.x;
@@ -91,14 +92,7 @@ export class ViewLineGraph extends LineGraph {
     setPointer(event) {
         this.prevPointer.x = this.pointer.x;
         this.prevPointer.y = this.pointer.y;
-        if (event.target == this.canvas)
-            super.setPointer(event);
-        else {
-            let rect = this.canvas.getBoundingClientRect();
-            const ratio = this.size.x / rect.width;
-            this.pointer.x = (event.clientX - rect.left) * ratio;
-            this.pointer.y = (event.clientY - rect.top) * ratio;
-        }
+        super.setPointer(event);
     }
     pointerdown(event) {
         this.setPointer(event);
@@ -113,25 +107,13 @@ export class ViewLineGraph extends LineGraph {
                 this.holding = 'both';
 
             if (this.holding) {
-                const pointerup = this.pointerup.bind(this);
-                window.addEventListener('pointerup', pointerup, {once: true});
+                this.canvas.setPointerCapture(event.pointerId);
             }
         } else super.pointerdown(event);
     }
     pointerup(event) {
         super.pointerup(event);
         this.holding = null;
-        if (this.moveListener) {
-            window.removeEventListener('pointermove', this.moveListener);
-            this.moveListener = null;
-        }
-    }
-    pointerleave(event) {
-        super.pointerleave(event);
-        if (this.holding && !this.moveListener) {
-            this.moveListener = this.pointermove.bind(this);
-            window.addEventListener('pointermove', this.moveListener);
-        }
     }
     pointermove(event) {
         super.pointermove(event);

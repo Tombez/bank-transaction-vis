@@ -8,6 +8,9 @@ export class LineGraph extends Graph {
         this.axisSpace = {x: 50, y: 30};
         this.generateColors();
         this.shouldDrawVertical = false;
+        this.labels = this.labels.map(l => ({name: l, active: true}));
+        for (let i = 0; i < this.values.length; ++i)
+            this.values[i].label = this.labels[i];
     }
     generateColors() {
         let colors = Array.from({length: this.values.length}, () => new Color());
@@ -64,6 +67,7 @@ export class LineGraph extends Graph {
             ctx.globalAlpha = 0.7;
             ctx.lineJoin = 'round';
             for (const line of this.values) {
+                if (!line.label.active) continue;
                 ctx.strokeStyle = line.color.toString();
                 let dataPoints = [];
                 for (const point of line) {
@@ -190,11 +194,11 @@ export class LineGraph extends Graph {
                 const percentX = (this.pointer.x - this.axisSpace.x) / width;
                 const barX = dataRangeX.min + percentX * dataRangeX.diff;
                 this.drawVertical(ctx, dataRangeX, dataRangeY, barX);
-            }
+            } else this.verticalIntersections = null;
         });
     
         // Draw Title:
-        ctx.fillStyle = "white";
+        ctx.fillStyle = 'white';
         ctx.globalAlpha = 0.8;
         const x = ctx.width / 2;
         ctx.textAlign = 'center';
@@ -204,30 +208,73 @@ export class LineGraph extends Graph {
         ctx.globalAlpha = 1;
     
         // Draw Graph Key:
+        const keyItems = this.verticalIntersections ?
+            this.verticalIntersections.map(({line, label}) => [line, label]) :
+            this.values.map((line, i) => [line, this.labels[i]]);
         const keyFontSize = 18;
         ctx.setFontSize(keyFontSize, true);
-        ctx.textAlign = "right";
-        ctx.textBaseline = "middle";
+        const boxMargin = 10;
+        const keyBoxSize = 10;
+        const margin = 4;
+        const rowHeight = keyFontSize + margin;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
         let y = 0;
-        for (let i = 0; i < this.values.length; ++i) {
-            const line = this.values[i];
-            const label = this.labels[i];
+        for (const [line, label] of keyItems) {
             if (!line.inRange) continue;
-            ctx.fillStyle = "white";
-            ctx.fillText(label, ctx.width - 30, y += keyFontSize + 4);
+            const colorInactive = '#999';
+            ctx.fillStyle = label.active ? '#fff' : colorInactive;
+            const boxX = ctx.width - keyBoxSize - boxMargin;
+            ctx.fillText(label.name, boxX - boxMargin, y += rowHeight);
+
             ctx.fillStyle = line.color;
-            ctx.fillRect(ctx.width - 20, y - 7, 10, 10);
+            ctx.strokeStyle = colorInactive;
+            ctx.lineWidth = 1 + Math.sqrt(devicePixelRatio);
+            const args = [boxX, y - keyBoxSize / 2, keyBoxSize, keyBoxSize];
+            if (label.active) ctx.fillRect(...args);
+            else ctx.strokeRect(...args);
+
+            let rect = new DOMRect();
+            const textWidth = ctx.measureText(label.name).width;
+            rect.width = textWidth + keyBoxSize + boxMargin * 2;
+            rect.x = this.canvas.width - rect.width;
+            rect.y = y - keyFontSize / 2;
+            rect.height = rowHeight;
+
+            label.rect = rect;
         }
     }
     pointerdown(event) {
         super.pointerdown(event);
-        this.shouldDrawVertical = true;
-        this.hasChanged = true;
+        if (event.button == 0) { // left-click
+
+            let toggledLabel = false;
+            for (const label of this.labels) {
+                const pointInside = (p, rect) =>
+                    p.x >= rect.left && p.x <= rect.right &&
+                    p.y >= rect.top  && p.y <= rect.bottom;
+                if (pointInside(this.pointer, label.rect)) {
+                    toggledLabel = true;
+                    label.active = !label.active;
+                    this.changed = true;
+                    break;
+                }
+            }
+            if (!toggledLabel) {
+                this.shouldDrawVertical = true;
+                this.hasChanged = true;
+                this.canvas.setPointerCapture(event.pointerId);
+            }
+        } else if (event.button == 2) { // right-click
+
+        }
     }
     pointerup(event) {
         super.pointerup(event);
-        this.shouldDrawVertical = false;
-        this.hasChanged = true;
+        if (event.button == 0) {
+            this.shouldDrawVertical = false;
+            this.hasChanged = true;
+        }
     }
     pointermove(event) {
         super.pointermove(event);
@@ -243,9 +290,12 @@ export class LineGraph extends Graph {
         ctx.stroke();
         
         let intersections = this.getIntersections(barX);
-        const r = 4;
+        intersections.sort(({y: ay}, {y: by}) => by - ay);
+        this.verticalIntersections = intersections;
+        const r = 3 + window.devicePixelRatio;
         const margin = 3;
-        for (let {line, x, y, label} of intersections) {
+        for (let i = intersections.length - 1; i >= 0; --i) {
+            let {line, x, y, valueString} = intersections[i];
             ({x, y} = this.toPixelSpace({x, y}, dataRangeX, dataRangeY));
             ctx.beginPath();
             ctx.fillStyle = line.color;
@@ -253,13 +303,17 @@ export class LineGraph extends Graph {
             ctx.arc(x, y, r, 0, 2 * Math.PI);
             ctx.fill();
 
-            ctx.fillStyle = '#fff';
             ctx.textAlign = "left";
             ctx.textBaseline = "middle";
             ctx.temp(() => {
                 ctx.translate(x + r + margin, y);
+                const halfHeight = ctx.fontSize / 2;
+                const width = ctx.measureText(valueString).width;
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, -halfHeight, width, halfHeight * 2);
                 ctx.scale(1, -1);
-                ctx.fillText(label, 0, 0);
+                ctx.fillStyle = '#fff';
+                ctx.fillText(valueString, 0, 0);
             })
         }
     }
@@ -268,6 +322,7 @@ export class LineGraph extends Graph {
         for (let i = 0; i < this.values.length; ++i) {
             const line = this.values[i];
             const label = this.labels[i];
+            if (!label.active) continue;
             const index = binarySearchI(line, ({x}) => targetX - x);
             let beforeItem = line[index];
             if (beforeItem.x > targetX || index == line.length - 1) continue;
@@ -278,7 +333,8 @@ export class LineGraph extends Graph {
                 (end - start) * percent + start;
             const percent = reverseInterpolate(beforeItem.x, afterItem.x, targetX);
             const y = interpolate(beforeItem.y, afterItem.y, percent);
-            intersections.push({line, x: targetX, y, label});
+            const valueString = (Math.round(y * 100) / 100).toLocaleString();
+            intersections.push({line, x: targetX, y, label, valueString});
         }
         return intersections;
     }

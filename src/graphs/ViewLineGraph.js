@@ -96,24 +96,29 @@ export class ViewLineGraph extends LineGraph {
     }
     pointerdown(event) {
         this.setPointer(event);
-        if (this.pointer.y >= this.ctx.height) {
-            const pointer = this.pointer;
-            const r = this.ballRadius;
-            if (pointer.x >= this.range.min - r && pointer.x <= this.range.min + r)
-                this.holding = 'min';
-            else if (pointer.x >= this.range.max - r && pointer.x <= this.range.max + r)
-                this.holding = 'max';
-            else if (pointer.x > this.range.min + r && pointer.x < this.range.max - r)
-                this.holding = 'both';
+        console.debug('pointerdown button', event.button);
+        if (event.button == 0) {
+            if (this.pointer.y >= this.ctx.height) {
+                const pointer = this.pointer;
+                const r = this.ballRadius;
+                if (pointer.x >= this.range.min - r && pointer.x <= this.range.min + r)
+                    this.holding = 'min';
+                else if (pointer.x >= this.range.max - r && pointer.x <= this.range.max + r)
+                    this.holding = 'max';
+                else if (pointer.x > this.range.min + r && pointer.x < this.range.max - r)
+                    this.holding = 'both';
 
-            if (this.holding) {
-                this.canvas.setPointerCapture(event.pointerId);
-            }
-        } else super.pointerdown(event);
+                if (this.holding) {
+                    this.canvas.setPointerCapture(event.pointerId);
+                }
+            } else super.pointerdown(event);
+        }
     }
     pointerup(event) {
         super.pointerup(event);
-        this.holding = null;
+        if (event.button == 0) {
+            this.holding = null;
+        }
     }
     pointermove(event) {
         super.pointermove(event);

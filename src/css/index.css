@@ -1,3 +1,5 @@
+[hidden] { display:none; }
+
 html {
     --main-bg-color: #18191b;
     --main-color: #cad2da;
@@ -19,6 +21,9 @@ body {
     background-color: var(--main-bg-color);
     color: var(--main-color);
     font: 18px Ubuntu, sans-serif;
+    position: relative;
+    display: flex;
+    flex-direction: column;
 }
 header {
     font-size: calc(0.5em + 0.5vw);
@@ -74,6 +79,12 @@ canvas {
     margin-left: 0.5vw;
     max-width: 96%;
 }
+#transactions {
+    display: flex;
+    flex-direction: column;
+    justify-content: end;
+    flex-grow: 1;
+}
 .transactions {
     display: none;
     border: 2px solid rgb(49, 49, 53);
@@ -81,6 +92,7 @@ canvas {
     max-height: 80%;
     overflow-y: scroll;
 }
+#transactions[hidden] { display:none; }
 table {
     border-collapse: separate;
     border-spacing: 0;
@@ -101,6 +113,7 @@ table td {
 }
 td, th {
     padding-left: 3px;
+    padding-right: 3px;
     white-space: nowrap;
 }
 .table-content-wrapper {
@@ -274,6 +287,8 @@ td, th {
     position: sticky;
     top: 0;
     z-index: 1;
+    overflow-y: clip;
+    padding-top: 1px;
 }
 .tab-bar > div {
     flex-grow: 1;
@@ -321,9 +336,7 @@ td, th {
     clip-path: inset(-15px -15px 0px -15px);
     z-index: 2;
 }
-.tab-content {
-    z-index: 2;
-}
+.tab-content { }
 .tab-bar input[type="radio"] {
     appearance: none;
     clip: rect(0 0 0 0); 
@@ -339,6 +352,22 @@ label[for="transaction-input"] {
     display: block;
     padding-top: 1vh;
     padding-bottom: 1vw;
+}
+.context-menu {
+    position: absolute;
+    background-color: var(--main-bg-color);
+    box-shadow: 0px 0px 5px 5px #00000033;
+    padding: 15px 0px;
+    border-radius: 10px;
+}
+.context-menu-item {
+    padding: 10px 15px;
+    background: transparent;
+    border: 0;
+    font-size: 14px;
+}
+.context-menu-item:hover {
+    background-color: #3e4046;
 }
 
 

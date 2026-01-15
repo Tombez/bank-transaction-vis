@@ -4,6 +4,7 @@ import {CSV} from "./CSVTable.js";
 import {dateToYmd} from "./date-utils.js";
 import BarGraph from "./graphs/BarGraph.js";
 import {ViewLineGraph} from "./graphs/ViewLineGraph.js";
+import AccountBalancesGraph from './graphs/AccountBalancesGraph.js';
 import {Bank, Account, TransactionFile} from "./Account.js";
 import {TabBar} from "./TabBar.js";
 import TransactionViewer from "./TransactionViewer.js";
@@ -228,8 +229,9 @@ const compileTransactions = () => {
                 for (const t of fileTransactions) {
                     transactions.push(t);
                     account.transactions.push(t);
+                    const dateStr = dateToYmd(t.date);
                     rows.push([
-                        bank.name, account.name, t.date, t.desc, t.amount]);
+                        bank.name, account.name, dateStr, t.desc, t.amount]);
                 }
             }
         }
@@ -263,7 +265,7 @@ const compileTransactions = () => {
     balRange.diff = balRange.max - balRange.min;
     
     
-    makeBalancesGraph(accounts, stampRange, balRange);
+    makeBalancesGraph(accounts, transactions, stampRange, balRange);
     makeNetWorthGraph(accounts, stampRange, balRange);
 };
 const loadTransactions = (transactions) => {
@@ -370,12 +372,12 @@ const calculateDailyBalances = (accounts) => {
         }
     }
 };
-const makeBalancesGraph = (accounts, stampRange, balRange) => {
+const makeBalancesGraph = (accounts, transactions, stampRange, balRange) => {
     const values = accounts.map(a => createBalLine(a.transactions));
     const title = 'Account Balances Over Time';
     const size = {x: 800, y: 640};
     const labels = accounts.map(a => `${a.bank.name} ${a.name}`);
-    const graph = new ViewLineGraph(title, values, labels, size, stampRange, balRange);
+    const graph = new AccountBalancesGraph(title, values, labels, size, stampRange, balRange);
     graphs.push(graph);
     document.querySelector('#chart').appendChild(graph.node);
 };

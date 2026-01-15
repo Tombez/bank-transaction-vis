@@ -34,8 +34,7 @@ export class TabBar {
         this.node.appendChild(tabNode);
         this.nodes.push(tabNode);
         if (!this.selected) {
-            this.selected = tabNode;
-            node.hidden = false;
+            this.change({target: radio});
             radio.checked = true;
         } else node.hidden = true;
         return tabNode;

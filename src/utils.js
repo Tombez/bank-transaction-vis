@@ -9,3 +9,17 @@ export const binarySearchI = (array, cb) => {
     }
     return min;
 };
+
+export class Range {
+    constructor(min = 0, max = 1) {
+        this.min = min;
+        this.max = max;
+        this.diff = max - min;
+    }
+    contains(value) {
+        return value >= this.min && value <= this.max;
+    }
+    isEqual(range) {
+        return this.min == range.min && this.max == range.max;
+    }
+}

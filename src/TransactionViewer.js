@@ -1,4 +1,5 @@
 import {LazyHtml} from './LazyHtml.js';
+import {dateToYmd} from "./date-utils.js";
 
 export default class TransactionViewer extends LazyHtml {
     constructor(header, transactions) {
@@ -6,31 +7,36 @@ export default class TransactionViewer extends LazyHtml {
         this.header = header;
         this.transactions = transactions;
         this.itemsPerPage = 8;
-        this.pageCount = Math.ceil(this.transactions.length / this.itemsPerPage);
-        this.page = 0;
+        this.filters = [];
+        this.update();
     }
     generateHtml() {
         super.generateHtml();
         this.node.className = 'transaction-viewer';
+
+        this.filtersNode = document.createElement('div');
+        this.node.appendChild(this.filtersNode);
+
         const tableWrapper = document.createElement('div');
         tableWrapper.className = 'table-content-wrapper';
-        this.node.appendChild(tableWrapper);
         let tableHTML = `<table>
-            <thead class="sticky-header">
-                ${
-                    this.header
-                    ?
-                    `<tr>
-                        ${this.header.map(h => `<th scope="col">${h}</th>`).join("\n")}
-                    </tr>`
-                    :
-                    ""
-                }
-            </thead>
-            <tbody>
-            </tbody>
-            </table>`;
+        <thead class="sticky-header">
+        ${
+            this.header
+            ?
+            `<tr>
+            ${this.header.map(h => `<th scope="col">${h}</th>`).join("\n")}
+            </tr>`
+            :
+            ""
+        }
+        </thead>
+        <tbody>
+        </tbody>
+        </table>`;
         tableWrapper.innerHTML = tableHTML;
+        this.node.appendChild(tableWrapper);
+
         const pageBar = document.createElement('div');
         pageBar.className = 'page-bar btn-wrapper';
         pageBar.innerHTML = `
@@ -44,44 +50,44 @@ export default class TransactionViewer extends LazyHtml {
         <div class="page-items"></div>
         `;
         this.node.appendChild(pageBar);
+        
         this.node.querySelector('.icon-left').addEventListener('click', () => {
-            if (this.page > 0) {
-                this.displayPage(--this.page);
-            }
+            this.displayPage(--this.page);
         });
         this.node.querySelector('.icon-right').addEventListener('click', () => {
-            if (this.page + 1 < this.pageCount) {
-                this.displayPage(++this.page);
-            }
+            this.displayPage(++this.page);
         });
         this.node.querySelector('.page-first').addEventListener('click', () =>
             this.displayPage(this.page = 0));
-        this.node.querySelector('.page-btn.page-last').addEventListener('click', () =>
-            this.displayPage(this.page = this.pageCount - 1));
-        this.displayPage(this.page);
+        this.node.querySelector('.page-btn.page-last').addEventListener('click',
+            () => this.displayPage(this.page = this.pageCount - 1));
+        this.update();
     }
     displayPage(number) {
         if (number > this.pageCount - 1) number = this.pageCount - 1;
         if (number < 0) number = 0;
+        this.page = number;
 
         this.node.querySelector('.page-selected').innerText = number + 1;
         const pageItems = this.node.querySelector('.page-items');
         const itemStart = this.page * this.itemsPerPage + 1;
         let itemEnd = itemStart - 1 + this.itemsPerPage;
-        itemEnd = Math.min(itemEnd, this.transactions.length);
-        pageItems.innerText = `Items ${itemStart}–${itemEnd} of ${this.transactions.length}`;
+        itemEnd = Math.min(itemEnd, this.rows.length);
+        pageItems.innerText = `Items ${itemStart}–${itemEnd} of ${this.rows.length}`;
+        const lastPage = this.node.querySelector('.page-btn.page-last');
+        lastPage.innerText = this.pageCount;
 
         for (const node of [...this.node.querySelectorAll('.page-first')])
             node.style.display = number == 0 ? 'none' : '';
         for (const node of [...this.node.querySelectorAll('.page-last')])
-            node.style.display = number == this.pageCount - 1 ? 'none' : '';
+            node.style.display = this.pageCount == 0 || number == this.pageCount - 1 ? 'none' : '';
 
         const startIndex = number * this.itemsPerPage;
         let endIndex = startIndex + this.itemsPerPage;
-        endIndex = Math.min(endIndex, this.transactions.length);
+        endIndex = Math.min(endIndex, this.rows.length);
         let rowsText = "";
         for (let i = startIndex; i < endIndex; ++i) {
-            const t = this.transactions[i];
+            const t = this.rows[i];
             rowsText += `<tr>
                     ${t.map(d => `<td>${d}</td>`).join("\n")}
                 </tr>\n`;
@@ -89,6 +95,25 @@ export default class TransactionViewer extends LazyHtml {
 
         const tbody = this.node.querySelector('tbody');
         tbody.innerHTML = rowsText;
+    }
+    update() {
+        let filtered = this.transactions;
+        for (const {test} of this.filters)
+            filtered = filtered.filter(test);
+        this.rows = filtered.map(t => {
+            const account = t.transactionFile.account;
+            const bank = account.bank;
+            const dateStr = dateToYmd(t.date);
+            return [bank.name, account.name, dateStr, t.desc, t.amount];
+        });
+        this.pageCount = Math.ceil(this.rows.length / this.itemsPerPage);
+        if (!this.page) this.page = 0;
+        if (this.hasNode) {
+            this.filtersNode.innerHTML = '';
+            for (const {label} of this.filters)
+                this.filtersNode.innerHTML += `<div class="filter">${label}</div>`;
+            this.displayPage(this.page);
+        }
     }
 }
 const updateOptions = (transactions, filterTransactions, minDateT, maxDateT) => {

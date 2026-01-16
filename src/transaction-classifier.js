@@ -8,7 +8,6 @@ import AccountBalancesGraph from './graphs/AccountBalancesGraph.js';
 import {Bank, Account, TransactionFile} from "./Account.js";
 import {TabBar} from "./TabBar.js";
 import TransactionViewer from "./TransactionViewer.js";
-import Vec2 from './Vec2.js';
 Array.prototype.best = function(toScore = a => a, direction = "min") {
     if (!this.length) return null;
     const isBetter = "min" == direction ? (a, b) => a < b : (a, b) => a > b;
@@ -29,6 +28,7 @@ let addBankBtn;
 let exportBtn;
 let classifiers = [];
 let bankList = window.bankList = [];
+let transactionTab = null;
 
 const updateloop = () => {
     for (const graph of graphs) {
@@ -217,9 +217,8 @@ const addTransactionFile = (tranFile) => {
     }
     account.addTransactionFile(tranFile);
 };
-const compileTransactions = () => {
+const compileTransactions = (filters = []) => {
     let transactions = [];
-    let rows = [];
     for (const bank of bankList) {
         for (const account of bank.accounts) {
             account.transactions = [];
@@ -229,9 +228,6 @@ const compileTransactions = () => {
                 for (const t of fileTransactions) {
                     transactions.push(t);
                     account.transactions.push(t);
-                    const dateStr = dateToYmd(t.date);
-                    rows.push([
-                        bank.name, account.name, dateStr, t.desc, t.amount]);
                 }
             }
         }
@@ -239,12 +235,7 @@ const compileTransactions = () => {
     transactions.sort((a, b) => a.timestamp - b.timestamp);
     removeGraphs();
 
-    const tranContainer = document.querySelector('#transactions');
-    const oldViewer = tranContainer.querySelector('.transaction-viewer');
-    if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
-    const header = 'Bank,Account,Date,Description,Amount'.split(',');
-    let tViewer = new TransactionViewer(header, rows);
-    tranContainer.appendChild(tViewer.node);
+    const tViewer = recreateTViewer(transactions);
     
     const accounts = bankList.map(bank => bank.accounts).flat();
     if (!accounts.length) return;
@@ -265,8 +256,17 @@ const compileTransactions = () => {
     balRange.diff = balRange.max - balRange.min;
     
     
-    makeBalancesGraph(accounts, transactions, stampRange, balRange);
+    makeBalancesGraph(accounts, tViewer, stampRange, balRange);
     makeNetWorthGraph(accounts, stampRange, balRange);
+};
+const recreateTViewer = (transactions) => {
+    const tranContainer = document.querySelector('#transactions');
+    const oldViewer = tranContainer.querySelector('.transaction-viewer');
+    if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
+    const header = 'Bank,Account,Date,Description,Amount'.split(',');
+    let tViewer = new TransactionViewer(header, transactions);
+    tranContainer.appendChild(tViewer.node);
+    return tViewer;
 };
 const loadTransactions = (transactions) => {
     console.debug('transactions: ', transactions);
@@ -321,25 +321,6 @@ const loadTransactions = (transactions) => {
     
     // updateOptions(transactions, filterTransactions, minDateT, maxDateT);
 };
-const createBalLine = (transactions) => {
-    if (!transactions.length) return [];
-    transactions.sort((a, b) => a.timestamp - b.timestamp);
-    
-    let line = [];
-    let bal = 0;
-    for (let i = 0; i < transactions.length;) {
-        let startIndex = i;
-        const stamp = transactions[startIndex].timestamp;
-        const prevBal = bal;
-        for (; i < transactions.length &&
-            transactions[i].timestamp == stamp; ++i)
-                bal += transactions[i].amount;
-        
-        line.push(new Vec2(stamp, prevBal));
-        line.push(new Vec2(stamp, bal));
-    }
-    return line;
-};
 const calculateDailyBalances = (accounts) => {
     for (const account of accounts) {
         const dailyChange = account.dailyChange = new Map();
@@ -372,12 +353,13 @@ const calculateDailyBalances = (accounts) => {
         }
     }
 };
-const makeBalancesGraph = (accounts, transactions, stampRange, balRange) => {
-    const values = accounts.map(a => createBalLine(a.transactions));
-    const title = 'Account Balances Over Time';
-    const size = {x: 800, y: 640};
-    const labels = accounts.map(a => `${a.bank.name} ${a.name}`);
-    const graph = new AccountBalancesGraph(title, values, labels, size, stampRange, balRange);
+const makeBalancesGraph = (accounts, tViewer, stampRange, balRange) => {
+    const graph = new AccountBalancesGraph(accounts, stampRange, balRange);
+    graph.node.addEventListener('view-transactions', ({detail: filters}) => {
+        tViewer.filters = filters;
+        tViewer.update();
+        transactionTab.childNodes[1]?.click();
+    });
     graphs.push(graph);
     document.querySelector('#chart').appendChild(graph.node);
 };
@@ -662,7 +644,8 @@ const afterPageLoad = event => {
     document.querySelector('header').after(tabBar.node);
     tabBar.addTab('Banks', document.querySelector('#bank-tab'));
     tabBar.addTab('Charts', document.querySelector('#chart'));
-    tabBar.addTab('Transactions', document.querySelector('#transactions'));
+    const transactionElm = document.querySelector('#transactions');
+    transactionTab = tabBar.addTab('Transactions', transactionElm);
 
     textInp = document.querySelector("#transaction-input");
     unlabeledDiv = document.querySelector("#unlabeled");

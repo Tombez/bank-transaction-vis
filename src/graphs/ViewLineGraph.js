@@ -1,5 +1,6 @@
 import {LineGraph} from './LineGraph.js';
 import {dateToYmd} from '../date-utils.js';
+import {Range} from '../utils.js';
 
 export class ViewLineGraph extends LineGraph {
     constructor(title, values, labels, size, dataRangeX, dataRangeY) {
@@ -17,15 +18,18 @@ export class ViewLineGraph extends LineGraph {
         super.generateHtml();
         this.ctx.height -= this.viewSliderHeight;
     }
-    draw(ctx = this.ctx) {
+    getViewRange() {
         const width = this.canvas.width - this.axisSpace.x;
         const minPercent = (this.range.min - this.axisSpace.x) / width;
         const maxPercent = (this.range.max - this.axisSpace.x) / width;
         let min = this.dataRangeX.min + minPercent * this.dataRangeX.diff;
         let max = this.dataRangeX.min + maxPercent * this.dataRangeX.diff;
-        const rangeX = {min, max, diff: max - min};
-        min = Infinity;
-        max = -Infinity;
+        return new Range(min, max);
+    }
+    draw(ctx = this.ctx) {
+        const rangeX = this.getViewRange();
+        let min = Infinity;
+        let max = -Infinity;
         for (const line of this.values) {
             if (!line.label.active) continue;
             let oneInRange = false;

@@ -1,6 +1,6 @@
 export const removeCR = text => text.replaceAll(/\r\n?/g, "\n");
 
-export const readCSV = text => {
+export const readCsv = text => {
     const quoteReg = /"((?:[^"]|"")*)"/y;
     const noQuoteReg = /((?:[^,\n\r])*)/y;
     const eol = /\r\n|\r|\n|$/y;
@@ -41,9 +41,9 @@ const isDate = /^(?:\d{4}([-\/\.])\d{1,2}\1\d{1,2}|\d{1,2}([-\/\.])\d{1,2}\2\d{2
 const couldBeHeaderValue = value => !value ||
     !onlyNumericWithDecimal.test(value) && !isDate.test(value);
 
-export class CSV {
+export class Csv {
     constructor(text = "", hasHeader, linesToSkip = 0) {
-        this.rows = readCSV(text);
+        this.rows = readCsv(text);
         if (linesToSkip) this.rows.splice(0, linesToSkip);
         this.hasHeader = hasHeader === undefined ? this.detectHeader() :
             hasHeader;
@@ -56,7 +56,7 @@ export class CSV {
         return firstRow.length && firstRow.every(couldBeHeaderValue);
     }
     makeReorder(columns) {
-        let csv = new CSV();
+        let csv = new Csv();
         if (this.hasHeader) this.rows.push(this.headings);
         for (let y = 0; y < this.rows.length; ++y) {
             const row = this.rows[y];
@@ -75,7 +75,7 @@ export class CSV {
         this.rows = this.rows.concat(csv.rows);
     }
     clone() {
-        let clone = new CSV();
+        let clone = new Csv();
         clone.hasHeader = this.hasHeader;
         clone.headings = this.headings.slice();
         clone.rows = this.rows.map(row => row.slice());
@@ -84,7 +84,7 @@ export class CSV {
     toString() {
         const headerText = this.hasHeader ? this.headings.join(",") + "\n" : "";
         return headerText + this.rows.map(
-            row => row.map(CSV.escapeValue).join(","))
+            row => row.map(Csv.escapeValue).join(","))
             .join("\n");
     }
     static escapeValue(value) {
@@ -92,24 +92,4 @@ export class CSV {
             `"${value.replaceAll('"', '""')}"` :
             value;
     };
-}
-
-export default class CSVTable extends CSV {
-    constructor(text, hasHeader) {
-        super(text, hasHeader);
-
-        this.table = document.createElement("table");
-        console.log(this.headings);
-        let tableHTML = `<thead>
-            <tr>
-            ${this.headings.map(h => `<th scope="col">${h}</th>`).join("\n")}
-            </tr>
-        </thead>
-        <tbody>
-            ${rows.map(t => `<tr>
-                ${t.map(d => `<td>${d}</td>`).join("\n")}
-            </tr>`).join("\n")}
-        </tbody>`;
-        this.table.innerHTML = tableHTML;
-    }
 }

@@ -1,6 +1,6 @@
 import HierarchalPieGraph from "./graphs/HierarchalPieGraph.js";
 import FlowGraph from "./graphs/FlowGraph.js";
-import {CSV} from "./CSVTable.js";
+import {Csv} from "./Csv.js";
 import {dateToYmd} from "./date-utils.js";
 import BarGraph from "./graphs/BarGraph.js";
 import {ViewLineGraph} from "./graphs/ViewLineGraph.js";
@@ -145,7 +145,7 @@ const serializeClassifiers = (classifiers) => {
     return mapToArrayRecursive(categories);
 };
 const loadCsvFile = (file, text) => {
-    const csv = new CSV(text);
+    const csv = new Csv(text);
     const firstFile = new TransactionFile(file, csv);
     let tranFiles = [];
 
@@ -263,8 +263,7 @@ const recreateTViewer = (transactions) => {
     const tranContainer = document.querySelector('#transactions');
     const oldViewer = tranContainer.querySelector('.transaction-viewer');
     if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
-    const header = 'Bank,Account,Date,Description,Amount'.split(',');
-    let tViewer = new TransactionViewer(header, transactions);
+    let tViewer = new TransactionViewer(transactions);
     tranContainer.appendChild(tViewer.node);
     return tViewer;
 };
@@ -294,7 +293,7 @@ const loadTransactions = (transactions) => {
     const addGraphForCategory = (category, title = category, invert = false) => {
         labelTransactions(transactions);
         let year = minDateT.year, quarter = minDateT.quarter;
-        let interestCSV = "";
+        let interestCsv = "";
         let interestData = [], interestLabels = [];
         while (year * 4 + quarter <= maxDateT.year * 4 + maxDateT.quarter) {
             let filtered = filterTransactions(year, quarter);
@@ -303,7 +302,7 @@ const loadTransactions = (transactions) => {
             if (invert) interest *= -1;
             interest = interest.toFixed(2);
             const label = `${year} Q${quarter + 1}`;
-            interestCSV += `${label}, ${interest}\n`;
+            interestCsv += `${label}, ${interest}\n`;
             interestData.push(interest);
             interestLabels.push(label);
             year += quarter == 3;
@@ -313,7 +312,7 @@ const loadTransactions = (transactions) => {
         let graph = new BarGraph(title, interestData, interestLabels, size);
         graphs.push(graph);
         document.body.appendChild(graph.node);
-        console.debug(interestCSV);
+        console.debug(interestCsv);
     };
     // addGraphForCategory('Interest', 'Quarterly Interest Earned');
     // addGraphForCategory('Food', 'Quarterly Food Spending', true);
@@ -463,7 +462,7 @@ const labelTransactions = transactions => {
         if (!curCategory.transactions) curCategory.transactions = [];
         curCategory.transactions.push(transaction);
     }
-    // let labeledCSV = transactions.map(row => row.join(",")).join("\n");
+    // let labeledCsv = transactions.map(row => row.join(",")).join("\n");
 
     const ignored = categories.get("Ignored");
     categories.delete("Ignored");

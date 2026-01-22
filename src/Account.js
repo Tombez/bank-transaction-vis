@@ -1,7 +1,7 @@
-import TransactionViewer from "./TransactionViewer.js";
+import {CsvViewer} from "./CsvViewer.js";
 import {fromDateString, dateToMdy} from "./date-utils.js";
 import memoMixin from "./memoMixin.js";
-import {CSV} from './CSVTable.js';
+import {Csv} from './Csv.js';
 import {makeDraggable, makeDroppable} from './dragAndDrop.js';
 import {LazyHtmlMixin, LazyHtml} from './LazyHtml.js';
 
@@ -490,8 +490,8 @@ export class TransactionFile extends Named {
 
         // Append Viewer
         const header = this.csv.hasHeader && this.csv.headings;
-        let tViewer = new TransactionViewer(header, this.csv.rows);
-        this.content.node.appendChild(tViewer.node);
+        let viewer = new CsvViewer(this.csv);
+        this.content.node.appendChild(viewer.node);
     }
     settingChanged(event) {
         // if (this.settings.get('hasCdIndicator')) {
@@ -589,7 +589,7 @@ export class TransactionFile extends Named {
     }
     static decode(tranFileObj) {
         const name = tranFileObj.settings['file'];
-        const csv = new CSV(tranFileObj.csv);
+        const csv = new Csv(tranFileObj.csv);
         let tranFile = new TransactionFile({name}, csv);
         tranFile.settings.fromEncoded(tranFileObj.settings);
         tranFile.checkFullyFilled();

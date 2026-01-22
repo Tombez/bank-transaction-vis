@@ -1,119 +1,44 @@
-import {LazyHtml} from './LazyHtml.js';
-import {dateToYmd} from "./date-utils.js";
+import {Csv} from './Csv.js';
+import {CsvViewer} from './CsvViewer.js';
+import {dateToYmd} from './date-utils.js';
 
-export default class TransactionViewer extends LazyHtml {
-    constructor(header, transactions) {
-        super();
-        this.header = header;
+export default class TransactionViewer extends CsvViewer {
+    constructor(transactions) {
+        const csv = new Csv('', true);
+        csv.headings = 'Bank,Account,Date,Description,Amount'.split(',');
+        super(csv);
         this.transactions = transactions;
-        this.itemsPerPage = 8;
         this.filters = [];
         this.update();
     }
     generateHtml() {
         super.generateHtml();
-        this.node.className = 'transaction-viewer';
+        this.node.classList.add('transaction-viewer');
 
         this.filtersNode = document.createElement('div');
-        this.node.appendChild(this.filtersNode);
-
-        const tableWrapper = document.createElement('div');
-        tableWrapper.className = 'table-content-wrapper';
-        let tableHTML = `<table>
-        <thead class="sticky-header">
-        ${
-            this.header
-            ?
-            `<tr>
-            ${this.header.map(h => `<th scope="col">${h}</th>`).join("\n")}
-            </tr>`
-            :
-            ""
-        }
-        </thead>
-        <tbody>
-        </tbody>
-        </table>`;
-        tableWrapper.innerHTML = tableHTML;
-        this.node.appendChild(tableWrapper);
-
-        const pageBar = document.createElement('div');
-        pageBar.className = 'page-bar btn-wrapper';
-        pageBar.innerHTML = `
-        <div class="icon icon-left" aria-label="previous" title="previous"></div>
-        <div class="icon page-btn page-first">1</div>
-        <div class="ellipsis page-first">..</div>
-        <div class="icon page-btn page-selected">1</div>
-        <div class="ellipsis page-last">..</div>
-        <div class="icon page-btn page-last">${this.pageCount}</div>
-        <div class="icon icon-right" aria-label="next" title="next"></div>
-        <div class="page-items"></div>
-        `;
-        this.node.appendChild(pageBar);
-        
-        this.node.querySelector('.icon-left').addEventListener('click', () => {
-            this.displayPage(--this.page);
-        });
-        this.node.querySelector('.icon-right').addEventListener('click', () => {
-            this.displayPage(++this.page);
-        });
-        this.node.querySelector('.page-first').addEventListener('click', () =>
-            this.displayPage(this.page = 0));
-        this.node.querySelector('.page-btn.page-last').addEventListener('click',
-            () => this.displayPage(this.page = this.pageCount - 1));
+        this.node.insertBefore(this.filtersNode, this.node.firstChild);
         this.update();
     }
-    displayPage(number) {
-        if (number > this.pageCount - 1) number = this.pageCount - 1;
-        if (number < 0) number = 0;
-        this.page = number;
-
-        this.node.querySelector('.page-selected').innerText = number + 1;
-        const pageItems = this.node.querySelector('.page-items');
-        const itemStart = this.page * this.itemsPerPage + 1;
-        let itemEnd = itemStart - 1 + this.itemsPerPage;
-        itemEnd = Math.min(itemEnd, this.rows.length);
-        pageItems.innerText = `Items ${itemStart}–${itemEnd} of ${this.rows.length}`;
-        const lastPage = this.node.querySelector('.page-btn.page-last');
-        lastPage.innerText = this.pageCount;
-
-        for (const node of [...this.node.querySelectorAll('.page-first')])
-            node.style.display = number == 0 ? 'none' : '';
-        for (const node of [...this.node.querySelectorAll('.page-last')])
-            node.style.display = this.pageCount == 0 || number == this.pageCount - 1 ? 'none' : '';
-
-        const startIndex = number * this.itemsPerPage;
-        let endIndex = startIndex + this.itemsPerPage;
-        endIndex = Math.min(endIndex, this.rows.length);
-        let rowsText = "";
-        for (let i = startIndex; i < endIndex; ++i) {
-            const t = this.rows[i];
-            rowsText += `<tr>
-                    ${t.map(d => `<td>${d}</td>`).join("\n")}
-                </tr>\n`;
-        }
-
-        const tbody = this.node.querySelector('tbody');
-        tbody.innerHTML = rowsText;
-    }
-    update() {
+    getRows() {
         let filtered = this.transactions;
         for (const {test} of this.filters)
             filtered = filtered.filter(test);
-        this.rows = filtered.map(t => {
+        const rows = filtered.map(t => {
             const account = t.transactionFile.account;
             const bank = account.bank;
             const dateStr = dateToYmd(t.date);
             return [bank.name, account.name, dateStr, t.desc, t.amount];
         });
-        this.pageCount = Math.ceil(this.rows.length / this.itemsPerPage);
-        if (!this.page) this.page = 0;
-        if (this.hasNode) {
+        return rows;
+    }
+    update() {
+        this.csv.rows = this.getRows();
+        if (this.filtersNode) {
             this.filtersNode.innerHTML = '';
             for (const {label} of this.filters)
                 this.filtersNode.innerHTML += `<div class="filter">${label}</div>`;
-            this.displayPage(this.page);
         }
+        super.update();
     }
 }
 const updateOptions = (transactions, filterTransactions, minDateT, maxDateT) => {

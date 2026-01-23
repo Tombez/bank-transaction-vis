@@ -23,3 +23,5 @@ export class Range {
         return this.min == range.min && this.max == range.max;
     }
 }
+
+export const capitalize = s => s.at(0).toUpperCase() + s.slice(1).toLowerCase();

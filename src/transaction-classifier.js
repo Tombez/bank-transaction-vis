@@ -5,9 +5,11 @@ import {dateToYmd} from "./date-utils.js";
 import BarGraph from "./graphs/BarGraph.js";
 import {ViewLineGraph} from "./graphs/ViewLineGraph.js";
 import AccountBalancesGraph from './graphs/AccountBalancesGraph.js';
-import {Bank, Account, TransactionFile} from "./Account.js";
-import {TabBar} from "./TabBar.js";
-import TransactionViewer from "./TransactionViewer.js";
+import {TransactionFile} from './TransactionFile.js';
+import {Account} from './Account.js';
+import {Bank} from './Bank.js';
+import {TabBar} from './TabBar.js';
+import TransactionViewer from './TransactionViewer.js';
 Array.prototype.best = function(toScore = a => a, direction = "min") {
     if (!this.length) return null;
     const isBetter = "min" == direction ? (a, b) => a < b : (a, b) => a > b;

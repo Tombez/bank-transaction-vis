@@ -49,22 +49,24 @@ export class TransactionFile extends Named {
         // Add Column Settings
         const colOptions = csv.headings || csv.rows[0];
         for (const [regex, name] of colSearches) {
-            this.settings.add('select', name, `Which column contains transaction ${name}s?`, {change: event => {
-                this.settings.set(name, event.target.value);
-            }}, colOptions);
+            this.settings.add('select', name,
+                `Which column contains transaction ${name}s?`, {}, colOptions);
         }
 
-
-        this.settings.add('checkbox', 'hasCdIndicator', 'Is there a credit/debit indicator column?', {change: event => {
+        this.settings.add('checkbox', 'hasCdIndicator',
+            'Is there a credit/debit indicator column?', {change: event => {
             // cdIndSetting.parentNode.style.display = event.target.checked ? 'block' : 'none';
             this.settings.set('hasCdIndicator', event.target.checked);
         }});
-        this.settings.add('select', 'cdIndicator', 'Which is the credit/debit indicator column?', {change: event => {
-            this.settings.set('cdIndicator', event.target.value);
-        }}, colOptions);
+        this.settings.add('select', 'cdIndicator',
+            'Which is the credit/debit indicator column?', {}, colOptions);
         // cdIndSetting.parentNode.style.display = 'none';
 
-        this.settingChanged();
+        const changeOld = this.settings.settingChanged;
+        this.settings.settingChanged = (event) => {
+            changeOld.apply(this.settings, event);
+            this.settingChanged(event);
+        };
     }
     generateHtml() {
         super.generateHtml();

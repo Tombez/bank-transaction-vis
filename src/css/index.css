@@ -120,6 +120,10 @@ td, th {
     overflow-y: auto;
     max-height: 75vh;
 }
+.col-type {
+    color: #999;
+    font-size: 0.8em;
+}
 .sticky-header {
     position: sticky;
     top: 0;

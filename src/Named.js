@@ -30,11 +30,14 @@ const Settings = class extends LazyHtmlMixin(Map) {
         </label>`;
         this.node.appendChild(frag);
         const input = frag.querySelector('#' + id);
+        if (!events['change']) events['change'] = null;
         for (const eventName in events) {
             input.addEventListener(eventName, event => {
                 if (event.target.type == 'checkbox')
                     event.target.value = event.target.checked;
-                events[eventName](event);
+                this.set(name, event.target.value);
+                if (typeof events[eventName] == 'function')
+                    events[eventName](event);
                 this.settingChanged(event);
             });
         }

@@ -1,5 +1,22 @@
 import {LazyHtml} from './LazyHtml.js';
-import {Csv} from './Csv.js';
+import {Csv, CSV_DATA_TYPES} from './Csv.js';
+
+const typeText = (typesArray, i) => {
+    if (!typesArray || i >= typesArray.length) return 'Unknown';
+    const types = typesArray[i];
+    if (types.size > 1) return 'Mixed';
+
+    switch (Array.from(types.values())[0]) {
+        case CSV_DATA_TYPES.EMPTY:
+            return 'Empty';
+        case CSV_DATA_TYPES.NUMBER:
+            return 'Number';
+        case CSV_DATA_TYPES.DATE:
+            return 'Date';
+        default:
+            return 'String';
+    }
+};
 
 export class CsvViewer extends LazyHtml {
     constructor(csv) {
@@ -19,7 +36,9 @@ export class CsvViewer extends LazyHtml {
             this.csv.headings
             ?
             `<tr>
-            ${this.csv.headings.map(h => `<th scope="col">${h}</th>`).join("\n")}
+            ${this.csv.headings.map((h, i) => `
+                <th scope="col">${h}<br /><span class="col-type">${typeText(this.csv.colTypes, i)}</span></th>
+            `).join('\n')}
             </tr>`
             :
             ""

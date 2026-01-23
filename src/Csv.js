@@ -36,10 +36,25 @@ export const readCsv = text => {
 
 
 const onlyNumericWithDecimal = /^-?\d*\.?\d*$/;
+const withoutLetters = /^[^a-zA-Z]+$/;
 const isDate = /^(?:\d{4}([-\/\.])\d{1,2}\1\d{1,2}|\d{1,2}([-\/\.])\d{1,2}\2\d{2}(?:\d{2})?)$/;
 
 const couldBeHeaderValue = value => !value ||
     !onlyNumericWithDecimal.test(value) && !isDate.test(value);
+
+export const CSV_DATA_TYPES = {
+    EMPTY: 0,
+    NUMBER: 1,
+    DATE: 2,
+    STRING: 3
+};
+
+export const typeOf = str => {
+    if (!str) return CSV_DATA_TYPES.EMPTY;
+    if (isDate.test(str)) return CSV_DATA_TYPES.DATE;
+    if (withoutLetters.test(str)) return CSV_DATA_TYPES.NUMBER;
+    return CSV_DATA_TYPES.STRING;
+};
 
 export class Csv {
     constructor(text = "", hasHeader, linesToSkip = 0) {
@@ -48,12 +63,27 @@ export class Csv {
         this.hasHeader = hasHeader === undefined ? this.detectHeader() :
             hasHeader;
         if (this.hasHeader) this.headings = this.rows.shift();
+        this.update();
     }
     detectHeader() {
         if (!this.rows.length) return false;
 
         const firstRow = this.rows[0];
         return firstRow.length && firstRow.every(couldBeHeaderValue);
+    }
+    update() {
+        this.colCount = 0;
+        if (!this.rows.length) return;
+        this.colCount = this.rows[0].length;
+        this.colTypes = [];
+        for (let x = 0; x < this.colCount; ++x) {
+            const types = new Set();
+            for (const row of this.rows) {
+                types.add(typeOf(row[x]));
+            }
+            this.colTypes.push(types);
+        }
+        console.debug(this.colTypes);
     }
     makeReorder(columns) {
         let csv = new Csv();
@@ -73,6 +103,7 @@ export class Csv {
     }
     append(csv) {
         this.rows = this.rows.concat(csv.rows);
+        this.update();
     }
     clone() {
         let clone = new Csv();
@@ -91,5 +122,5 @@ export class Csv {
         return /["\n,]/g.test(value) ?
             `"${value.replaceAll('"', '""')}"` :
             value;
-    };
+    }
 }

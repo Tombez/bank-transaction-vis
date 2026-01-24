@@ -10,6 +10,18 @@ export const binarySearchI = (array, cb) => {
     return min;
 };
 
+export const best = function(array, toScore = a => a, direction = "min") {
+    if (!array.length) return null;
+    const isBetter = "min" == direction ? (a, b) => a < b : (a, b) => a > b;
+    let bestValue = "min" == direction ? Infinity : -Infinity;
+    return array.reduce((best, cur) => {
+        const curValue = toScore(cur);
+        return isBetter(curValue, bestValue) ? 
+            (bestValue = curValue, cur) : 
+            best;
+    }, bestValue);
+};
+
 export class Range {
     constructor(min = 0, max = 1) {
         this.min = min;
@@ -21,6 +33,18 @@ export class Range {
     }
     isEqual(range) {
         return this.min == range.min && this.max == range.max;
+    }
+    static fromValues(values) {
+        return new Range(best(values), best(values, a => a, 'max'));
+    }
+    static fromRanges(ranges) {
+        let min = Infinity;
+        let max = -Infinity;
+        for (const range of ranges) {
+            if (range.min < min) min = range.min;
+            if (range.max > max) max = range.max;
+        }
+        return new Range(min, max);
     }
 }
 

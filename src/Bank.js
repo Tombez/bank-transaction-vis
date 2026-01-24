@@ -43,6 +43,13 @@ export class Bank extends Addable(Named) {
             if (event.detail instanceof Account)
                 this.removeAccount(event.detail);
         });
+        this.checkFullyFilled();
+    }
+    generateHtml() {
+        super.generateHtml();
+        this.node.classList.add('bank-container');
+        this.node.addEventListener('change', event => this.checkFullyFilled());
+        this.checkFullyFilled();
     }
     generateContentHtml() {
         super.generateContentHtml();
@@ -61,6 +68,7 @@ export class Bank extends Addable(Named) {
         this.accounts.push(account);
         if (this.content.hasNode) this.content.node.appendChild(account.node);
         account.bank = this;
+        this.checkFullyFilled();
     }
     removeAccount(account) {
         const index = this.accounts.indexOf(account);
@@ -70,6 +78,15 @@ export class Bank extends Addable(Named) {
             else this.accounts.pop();
             account.bank = null;
             account.node.parentNode.removeChild(account.node);
+        }
+        this.checkFullyFilled();
+    }
+    checkFullyFilled() {
+        this.isFullyFilled = this.accounts.every(a => a.isFullyFilled);
+        if (this.hasNode) {
+            if (this.isFullyFilled) {
+                this.header.classList.add('fully-filled');
+            } else this.header.classList.remove('fully-filled');
         }
     }
     checkDuplicateAccountName(accountA) {

@@ -12,6 +12,13 @@ export class Account extends Named {
         });
         this.transactionFiles = [];
         this.headerFormats = [];
+        this.isFullyFilled = false;
+        this.checkFullyFilled();
+    }
+    generateHtml() {
+        super.generateHtml();
+        this.node.classList.add('account-container');
+
         makeDroppable(this.node, tranFile =>
                 tranFile instanceof TransactionFile && tranFile.account != this,
             tranFile => {
@@ -25,6 +32,8 @@ export class Account extends Named {
             if (event.detail instanceof TransactionFile)
                 this.removeTransactionFile(event.detail);
         });
+        this.node.addEventListener('change', event => this.checkFullyFilled());
+        this.checkFullyFilled();
     }
     generateContentHtml() {
         super.generateContentHtml();
@@ -40,6 +49,7 @@ export class Account extends Named {
             if (!this.headerFormats.includes(header))
                 this.headerFormats.push(header);
         }
+        this.checkFullyFilled();
     }
     removeTransactionFile(tranFile) {
         const index = this.transactionFiles.indexOf(tranFile);
@@ -48,10 +58,19 @@ export class Account extends Named {
         }
         tranFile.node.parentNode.removeChild(tranFile.node);
         tranFile.account = null;
+        this.checkFullyFilled();
     }
     absorb(account) {
         for (let file; file = account.transactionFiles.pop();)
             this.addTransactionFile(file);
+    }
+    checkFullyFilled() {
+        this.isFullyFilled = this.transactionFiles.every(t => t.isFullyFilled);
+        if (this.hasNode) {
+            if (this.isFullyFilled) {
+                this.header.classList.add('fully-filled');
+            } else this.header.classList.remove('fully-filled');
+        }
     }
     encode() {
         return {

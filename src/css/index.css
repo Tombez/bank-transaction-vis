@@ -123,6 +123,7 @@ td, th {
 .col-type {
     color: #999;
     font-size: 0.8em;
+    display: block;
 }
 .sticky-header {
     position: sticky;
@@ -147,7 +148,7 @@ td, th {
     user-select: none;
     -webkit-user-select: none;
 }
-.file-title .emoji {
+.emoji {
     color: orange;
 }
 .header.fully-filled .emoji {

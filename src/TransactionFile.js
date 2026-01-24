@@ -70,6 +70,7 @@ export class TransactionFile extends Named {
     }
     generateHtml() {
         super.generateHtml();
+        this.node.classList.add('transaction-file-container');
         makeDraggable(this.node, this, this.header);
         this.checkFullyFilled();
     }

@@ -37,7 +37,7 @@ export class CsvViewer extends LazyHtml {
             ?
             `<tr>
             ${this.csv.headings.map((h, i) => `
-                <th scope="col">${h}<br /><span class="col-type">${typeText(this.csv.colTypes, i)}</span></th>
+                <th scope="col">${h}<span class="col-type">${typeText(this.csv.colTypes, i)}</span></th>
             `).join('\n')}
             </tr>`
             :

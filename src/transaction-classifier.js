@@ -10,17 +10,7 @@ import {Account} from './Account.js';
 import {Bank} from './Bank.js';
 import {TabBar} from './TabBar.js';
 import TransactionViewer from './TransactionViewer.js';
-Array.prototype.best = function(toScore = a => a, direction = "min") {
-    if (!this.length) return null;
-    const isBetter = "min" == direction ? (a, b) => a < b : (a, b) => a > b;
-    let bestValue = "min" == direction ? Infinity : -Infinity;
-    return this.reduce((best, cur) => {
-        const curValue = toScore(cur);
-        return isBetter(curValue, bestValue) ? 
-            (bestValue = curValue, cur) : 
-            best;
-    }, bestValue);
-};
+import {Range, best} from './utils.js';
 
 const canvasSize = {x: 800, y: 800};
 const graphs = [];
@@ -245,18 +235,8 @@ const compileTransactions = (filters = []) => {
     loadTransactions(transactions);
     calculateDailyBalances(accounts);
     
-    const stampRange = {
-        min: accounts.best(({stampRange: {min}}) => min).stampRange.min,
-        max: accounts.best(({stampRange: {max}}) => max, "max").stampRange.max
-    };
-    stampRange.diff = stampRange.max - stampRange.min;
-    
-    const balRange = {
-        min: accounts.best(({balRange: {min}}) => min).balRange.min,
-        max: accounts.best(({balRange: {max}}) => max, "max").balRange.max
-    };
-    balRange.diff = balRange.max - balRange.min;
-    
+    const stampRange = Range.fromRanges(accounts.map(a => a.stampRange));
+    const balRange = Range.fromRanges(accounts.map(a => a.balRange));
     
     makeBalancesGraph(accounts, tViewer, stampRange, balRange);
     makeNetWorthGraph(accounts, stampRange, balRange);
@@ -286,8 +266,8 @@ const loadTransactions = (transactions) => {
     const filterCustom = (start, end) =>
         transactions.filter(t => t.timestamp >= start && t.timestamp < end);
     
-    const minDateT = transactions.best(({timestamp}) => timestamp);
-    const maxDateT = transactions.best(({timestamp}) => timestamp, "max");
+    const minDateT = best(transactions, ({timestamp}) => timestamp);
+    const maxDateT = best(transactions, ({timestamp}) => timestamp, 'max');
     const filterTransactions = (year, q = -1) =>
         transactions.filter(t =>
             (!year || t.year == year) && (!(q+1) || t.quarter == q));
@@ -332,8 +312,7 @@ const calculateDailyBalances = (accounts) => {
 
         const dailyChangeEntries = Array.from(dailyChange.entries());
         const stamps = Array.from(dailyChange.keys());
-        const stamp = account.stampRange =
-            {min: stamps.best(), max: stamps.best(a => a, "max")};
+        const stamp = account.stampRange = Range.fromValues(stamps);
         let dailyBalance = account.dailyBalance = [];
         Date.msDay = 1000 * 60 * 60 * 24;
         let i = 0;
@@ -344,8 +323,7 @@ const calculateDailyBalances = (accounts) => {
             for (; i < stampI; ++i) dailyBalance[i] = prevBal;
             dailyBalance[stampI] = prevBal += change;
         }
-        const balRange = account.balRange =
-            {min: dailyBalance.best(), max: dailyBalance.best(a => a, "max")};
+        const balRange = account.balRange = Range.fromValues(dailyBalance);
         if (!account.name.includes("Credit") && balRange.min < 0) {
             for (let i = 0; i < dailyBalance.length; ++i)
                 dailyBalance[i] -= balRange.min;

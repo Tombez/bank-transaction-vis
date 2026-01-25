@@ -1,3 +1,5 @@
+import {isDateStr} from './date-utils.js';
+
 export const removeCR = text => text.replaceAll(/\r\n?/g, "\n");
 
 export const readCsv = text => {
@@ -37,10 +39,9 @@ export const readCsv = text => {
 
 const onlyNumericWithDecimal = /^-?\d*\.?\d*$/;
 const withoutLetters = /^[^a-zA-Z]+$/;
-const isDate = /^(?:\d{4}([-\/\.])\d{1,2}\1\d{1,2}|\d{1,2}([-\/\.])\d{1,2}\2\d{2}(?:\d{2})?)$/;
 
 const couldBeHeaderValue = value => !value ||
-    !onlyNumericWithDecimal.test(value) && !isDate.test(value);
+    !onlyNumericWithDecimal.test(value) && !isDateStr(value);
 
 export const CSV_DATA_TYPES = {
     EMPTY: 0,
@@ -51,7 +52,7 @@ export const CSV_DATA_TYPES = {
 
 export const typeOf = str => {
     if (!str) return CSV_DATA_TYPES.EMPTY;
-    if (isDate.test(str)) return CSV_DATA_TYPES.DATE;
+    if (isDateStr(str)) return CSV_DATA_TYPES.DATE;
     if (withoutLetters.test(str)) return CSV_DATA_TYPES.NUMBER;
     return CSV_DATA_TYPES.STRING;
 };
@@ -62,7 +63,8 @@ export class Csv {
         if (linesToSkip) this.rows.splice(0, linesToSkip);
         this.hasHeader = hasHeader === undefined ? this.detectHeader() :
             hasHeader;
-        if (this.hasHeader) this.headings = this.rows.shift();
+        this.headings = this.hasHeader ? this.rows.shift() : null;
+        this.colTypes = [];
         this.update();
     }
     detectHeader() {
@@ -72,18 +74,13 @@ export class Csv {
         return firstRow.length && firstRow.every(couldBeHeaderValue);
     }
     update() {
-        this.colCount = 0;
         if (!this.rows.length) return;
-        this.colCount = this.rows[0].length;
-        this.colTypes = [];
-        for (let x = 0; x < this.colCount; ++x) {
-            const types = new Set();
-            for (const row of this.rows) {
-                types.add(typeOf(row[x]));
+        this.colTypes = this.rows[0].map(() => new Set());
+        for (const row of this.rows) {
+            for (let x = 0; x < row.length; ++x) {
+                this.colTypes[x].add(typeOf(row[x]));
             }
-            this.colTypes.push(types);
         }
-        console.debug(this.colTypes);
     }
     makeReorder(columns) {
         let csv = new Csv();

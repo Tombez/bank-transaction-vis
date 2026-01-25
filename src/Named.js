@@ -35,6 +35,8 @@ const Settings = class extends LazyHtmlMixin(Map) {
             input.addEventListener(eventName, event => {
                 if (event.target.type == 'checkbox')
                     event.target.value = event.target.checked;
+                let value = event.target.value;
+                if (isSelect) value--;
                 this.set(name, event.target.value);
                 if (typeof events[eventName] == 'function')
                     events[eventName](event);
@@ -51,9 +53,10 @@ const Settings = class extends LazyHtmlMixin(Map) {
     }
     updateInputs() {
         if (!this.hasNode) return;
-        for (const [key, value] of this.entries()) {
+        for (let [key, value] of this.entries()) {
             const input = this.inputs[key];
             if (input) {
+                if (input.tagName == 'SELECT') value++;
                 input.value = value;
                 if (input.type === 'checkbox') input.checked = value;
             }

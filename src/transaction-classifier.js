@@ -294,7 +294,6 @@ const loadTransactions = (transactions) => {
         let graph = new BarGraph(title, interestData, interestLabels, size);
         graphs.push(graph);
         document.body.appendChild(graph.node);
-        console.debug(interestCsv);
     };
     // addGraphForCategory('Interest', 'Quarterly Interest Earned');
     // addGraphForCategory('Food', 'Quarterly Food Spending', true);

@@ -29,6 +29,7 @@ export class Bank extends Addable(Named) {
             titleClass: 'bank-title'
         });
         this.accounts = [];
+        this.isFullyFilled = false;
 
         makeDroppable(this.node, data => {
                 return data instanceof Account && !this.accounts.includes(data);
@@ -97,6 +98,7 @@ export class Bank extends Addable(Named) {
             accountB.absorb(accountA);
             accountA.delete();
         }
+        this.checkFullyFilled();
         return accountB;
     }
     add() {

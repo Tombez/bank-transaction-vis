@@ -14,13 +14,19 @@ export const mdyToDate = (mdy, sep = "/") => {
     let [m,d,y] = mdy.split(sep);
     return new Date(y,m-1,d);
 };
-export const isDateStr = s => /\d{4}([^\d])\d\d?\1\d\d?|\d\d?([^\d])\d\d?\2\d{4}/.test(s);
+export const isDateNumerical = s => /\d{4}([^\d])\d\d?\1\d\d?|\d\d?([^\d])\d\d?\2\d{4}/.test(s);
+export const isDateWritten = s => /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) \d\d? \d\d\d\d$/i.test(s);
+export const isDateStr = s => isDateNumerical(s) || isDateWritten(s);
 export const isYmd = str => /^\d{4}/.test(str);
 export const fromDateString = (dateStr) => {
-    const separator = dateStr.match(/[^\d]/);
-    let [m,d,y] = dateStr.split(separator);
-    if (isYmd(dateStr)) [m, d, y] = [d, y, m];
-    return new Date(y,m-1,d);
+    if (isDateWritten(dateStr)) return new Date(dateStr);
+    if (isDateNumerical(dateStr)) {
+        const separator = dateStr.match(/[^\d]/);
+        let [m,d,y] = dateStr.split(separator);
+        if (isYmd(dateStr)) [m, d, y] = [d, y, m];
+        return new Date(y,m-1,d);
+    }
+    throw new Error(`'${dateStr}' is not a recognized date format.`);
 };
 export const fromYmdToMdy = (text, sep = "/") => {
     const separator = text.match(/[^\d]/);

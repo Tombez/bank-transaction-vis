@@ -93,7 +93,6 @@ export default class BarGraph extends Graph {
         this.labelScale = (this.canvas.width - this.valueOffset - labelEndSpace) / (numLabels - (this.options.lineVsBar ? 0.5 : 0));
     }
     draw(ctx) {
-        console.debug('bargraph draw');
         const textColor = '#fff';
         ctx.save();
         ctx.fillStyle = "#000";

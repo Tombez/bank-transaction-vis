@@ -13,7 +13,7 @@ export class Account extends Named {
         this.transactionFiles = [];
         this.headerFormats = [];
         this.isFullyFilled = false;
-        this.checkFullyFilled();
+        this.changed();
     }
     generateHtml() {
         super.generateHtml();
@@ -24,8 +24,6 @@ export class Account extends Named {
             tranFile => {
                 tranFile.account.removeTransactionFile(tranFile);
                 this.addTransactionFile(tranFile);
-                const event = new CustomEvent('change', {bubbles:true});
-                this.node.dispatchEvent(event);
             });
         makeDraggable(this.node, this, this.header);
         this.node.addEventListener('delete', event => {
@@ -33,7 +31,7 @@ export class Account extends Named {
                 this.removeTransactionFile(event.detail);
         });
         this.node.addEventListener('change', event => this.checkFullyFilled());
-        this.checkFullyFilled();
+        this.changed();
     }
     generateContentHtml() {
         super.generateContentHtml();
@@ -49,7 +47,7 @@ export class Account extends Named {
             if (!this.headerFormats.includes(header))
                 this.headerFormats.push(header);
         }
-        this.checkFullyFilled();
+        this.changed();
     }
     removeTransactionFile(tranFile) {
         const index = this.transactionFiles.indexOf(tranFile);
@@ -58,11 +56,19 @@ export class Account extends Named {
         }
         tranFile.node.parentNode.removeChild(tranFile.node);
         tranFile.account = null;
-        this.checkFullyFilled();
+        this.changed();
     }
     absorb(account) {
         for (let file; file = account.transactionFiles.pop();)
             this.addTransactionFile(file);
+    }
+    changed() {
+        this.checkFullyFilled();
+        const changeEvent = new CustomEvent('change', {
+            bubbles: true, detail: this});
+        if (this.hasNode) this.node.dispatchEvent(changeEvent);
+        else if (this.bank && this.bank.hasNode)
+            this.bank.node.dispatchEvent(changeEvent);
     }
     checkFullyFilled() {
         this.isFullyFilled = this.transactionFiles.every(t => t.isFullyFilled);

@@ -1,5 +1,5 @@
 import {Named} from './Named.js';
-import {Csv} from './Csv.js';
+import {Csv, CSV_DATA_TYPES} from './Csv.js';
 import {CsvViewer} from './CsvViewer.js';
 import {fromDateString, dateToMdy} from './date-utils.js';
 import {makeDraggable} from './dragAndDrop.js';
@@ -17,10 +17,10 @@ class Transaction {
 }
 
 const colSearches = [
-    [/^((transaction|trade|post(ed|ing)|effective|booking) )?date( created)?$/i, 'date'],
-    [/^(transaction )?description$/i, 'description'],
-    [/^(transaction |net )?amount|withdrawals?|debits?$/i, 'debit'],
-    [/^(transaction |net )?amount|deposits?|credits?$/i, 'credit'],
+    [CSV_DATA_TYPES.DATE, 'date', /^((transaction|trade|post(ed|ing)|effective|booking) )?date( created)?$/i],
+    [CSV_DATA_TYPES.STRING, 'description', /^(transaction )?description$/i],
+    [CSV_DATA_TYPES.NUMBER, 'debit', /^(transaction |net )?amount|withdrawals?|debits?$/i],
+    [CSV_DATA_TYPES.NUMBER, 'credit', /^(transaction |net )?amount|deposits?|credits?$/i],
 ];
 export class TransactionFile extends Named {
     constructor(file, csv) {
@@ -47,8 +47,8 @@ export class TransactionFile extends Named {
         this.settings.set('hasHeader', csv.hasHeader);
 
         // Add Column Settings
-        const colOptions = csv.headings || csv.rows[0];
-        for (const [regex, name] of colSearches) {
+        const colOptions = ['Unset', ...(csv.headings || csv.rows[0])];
+        for (const [type, name, regex] of colSearches) {
             this.settings.add('select', name,
                 `Which column contains transaction ${name}s?`, {}, colOptions);
         }
@@ -67,6 +67,7 @@ export class TransactionFile extends Named {
             changeOld.apply(this.settings, event);
             this.settingChanged(event);
         };
+        this.identifyCols();
     }
     generateHtml() {
         super.generateHtml();
@@ -83,25 +84,25 @@ export class TransactionFile extends Named {
         let viewer = new CsvViewer(this.csv);
         this.content.node.appendChild(viewer.node);
     }
-    settingChanged(event) {
-        // if (this.settings.get('hasCdIndicator')) {
-        //     const cdIndicator = this.settings.inputs['cdIndicator'];
-        //     if (cdIndicator) cdIndicator.parentNode.style.display = 'block';
-        // }
-
+    identifyCols() {
+        const indices = this.csv.headings.map((_,i) => i);
         if (this.csv.hasHeader) {
-            // Column Identification
-            for (const [regex, name] of colSearches) {
-                if (this.settings.get(name) > -1)
-                    continue;
-                let colIndex = this.csv.headings.findIndex(colName =>
-                    regex.test(colName));
+            // Column Identification By Name
+            for (const [type, name, regex] of colSearches) {
+                if (this.settings.has(name)) continue;
+
+                let colIndices = indices
+                    .filter(i =>
+                        regex.test(this.csv.headings[i]) &&
+                        this.csv.colTypes[i].size == 1 &&
+                        Array.from(this.csv.colTypes[i].values())[0] == type);
+                if (!colIndices.length) continue;
                 
-                this.settings.set(name, colIndex);
+                this.settings.set(name, colIndices[0]);
             }
 
-            if (!event || event.target != this.settings.inputs['hasCdIndicator'] &&
-                parseInt(this.settings.get('cdIndicator')) == -1
+            if (!this.settings.has('hasCdIndicator') ||
+                !this.settings.has('cdIndicator')
             ) {
                 // Check for credit/debit indicator
                 const cdIndicator = this.csv.headings.findIndex(colName =>
@@ -111,13 +112,33 @@ export class TransactionFile extends Named {
                     this.settings.set('cdIndicator', cdIndicator);
                 }
             }
+        } else {
+            
         }
 
+        // Column Identification by type
+        for (const [type, name] of colSearches) {
+            if (this.settings.has(name)) continue;
+            let colIndices = indices.filter(i =>
+                this.csv.colTypes[i].size == 1 &&
+                Array.from(this.csv.colTypes[i].values())[0] == type);
+            if (colIndices.length == 1) this.settings.set(name, colIndices[0]);
+        }
+        this.settings.updateInputs();
+        this.settingChanged();
+    }
+    settingChanged(event) {
+        // if (this.settings.get('hasCdIndicator')) {
+        //     const cdIndicator = this.settings.inputs['cdIndicator'];
+        //     if (cdIndicator) cdIndicator.parentNode.style.display = 'block';
+        // }
+
+        if (event) this.identifyCols();
         this.checkFullyFilled();
     }
     checkFullyFilled() {
-        this.isFullyFilled = colSearches.every(
-            ([,name]) => this.settings.get(name) > -1);
+        this.isFullyFilled = colSearches.every(([, name]) =>
+            this.settings.has(name) && this.settings.get(name) > -1);
         if (this.hasNode) {
             if (this.isFullyFilled) {
                 this.header.classList.add('fully-filled');
@@ -125,7 +146,9 @@ export class TransactionFile extends Named {
         }
     }
     getSimplifiedCsv(accountName) {
-        const simpleCsv = this.csv.makeReorder([-1, this.settings.get('date'), -1, this.settings.get('description'), -1]);
+        const simpleCsv = this.csv.makeReorder([
+            -1, this.settings.get('date'), -1,
+            this.settings.get('description'), -1]);
         simpleCsv.headings = `Account,Transaction Date,Posted Date,Description,Amount`.split(',');
         if (!simpleCsv.rows.length) return simpleCsv;
         

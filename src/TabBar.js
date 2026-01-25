@@ -10,7 +10,6 @@ export class TabBar {
         this.name = `name-${unique()}`;
     }
     change(event) {
-        console.debug('')
         const tabNode = event.target.parentNode;
         if (this.selected) {
             this.selected.content.hidden = true;

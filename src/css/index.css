@@ -374,6 +374,17 @@ label[for="transaction-input"] {
 .context-menu-item:hover {
     background-color: #3e4046;
 }
+.graph-container:has(>.activity-graph) {
+    padding-bottom: .8vh;
+}
+.activity-graph {
+    position: absolute;
+    top: 0;
+    width: 95%;
+    margin-top: 0;
+    min-height: 1px;
+    margin-left: 2.5%;
+}
 
 
 

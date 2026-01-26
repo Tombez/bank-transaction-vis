@@ -5,12 +5,13 @@ import {dateToYmd} from "./date-utils.js";
 import BarGraph from "./graphs/BarGraph.js";
 import {ViewLineGraph} from "./graphs/ViewLineGraph.js";
 import AccountBalancesGraph from './graphs/AccountBalancesGraph.js';
+import ActivityGraph from './graphs/ActivityGraph.js';
 import {TransactionFile} from './TransactionFile.js';
 import {Account} from './Account.js';
 import {Bank} from './Bank.js';
 import {TabBar} from './TabBar.js';
 import TransactionViewer from './TransactionViewer.js';
-import {Range, best} from './utils.js';
+import {Range, best, BitArray} from './utils.js';
 
 const canvasSize = {x: 800, y: 800};
 const graphs = [];
@@ -21,6 +22,7 @@ let exportBtn;
 let classifiers = [];
 let bankList = window.bankList = [];
 let transactionTab = null;
+let compileCounter = 0;
 
 const updateloop = () => {
     for (const graph of graphs) {
@@ -210,6 +212,7 @@ const addTransactionFile = (tranFile) => {
     account.addTransactionFile(tranFile);
 };
 const compileTransactions = (filters = []) => {
+    console.debug('compile', compileCounter++);
     let transactions = [];
     for (const bank of bankList) {
         for (const account of bank.accounts) {
@@ -217,6 +220,7 @@ const compileTransactions = (filters = []) => {
             for (const tranFile of account.transactionFiles) {
                 if (!tranFile.isFullyFilled) continue;
                 const fileTransactions = tranFile.getTransactions();
+                tranFile.transactions = fileTransactions;
                 for (const t of fileTransactions) {
                     transactions.push(t);
                     account.transactions.push(t);
@@ -240,6 +244,7 @@ const compileTransactions = (filters = []) => {
     
     makeBalancesGraph(accounts, tViewer, stampRange, balRange);
     makeNetWorthGraph(accounts, stampRange, balRange);
+    updateActivityGraphs(bankList, stampRange);
 };
 const recreateTViewer = (transactions) => {
     const tranContainer = document.querySelector('#transactions');
@@ -383,6 +388,27 @@ const makeNetWorthGraph = (accounts, stampRange, balRange) => {
     window.netWorthGraph = netWorthGraph;
     graphs.push(netWorthGraph);
     document.querySelector('#chart').appendChild(netWorthGraph.node);
+};
+const updateActivityGraphs = (banks, range) => {
+    const dayCount = Math.round(range.diff / Date.msDay) + 1;
+    let days = new BitArray(dayCount);
+    let accSum = new BitArray(dayCount);
+    let bankSum = new BitArray(dayCount);
+    for (const bank of banks) {
+        bankSum.data.fill(0);
+        for (const account of bank.accounts) {
+            accSum.data.fill(0);
+            for (const tranFile of account.transactionFiles) {
+                days.data.fill(0);
+                ActivityGraph.populateDays(days, tranFile.transactions, range);
+                tranFile.activityGraph?.update(days);
+                accSum.orEquals(days);
+            }
+            account.activityGraph?.update(accSum);
+            bankSum.orEquals(accSum);
+        }
+        bank.activityGraph.update(bankSum);
+    }
 };
 
 const encodeGraph = root => {

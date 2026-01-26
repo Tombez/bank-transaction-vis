@@ -1,6 +1,7 @@
 import {capitalize} from './utils.js';
 import {LazyHtmlMixin, LazyHtml} from './LazyHtml.js';
 import memoMixin from './memoMixin.js';
+import ActivityGraph from './graphs/ActivityGraph.js';
 
 const Settings = class extends LazyHtmlMixin(Map) {
     #settings = [];
@@ -93,6 +94,7 @@ const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Bas
         }}));
         
         this.name = name;
+        this.activityGraph = new ActivityGraph();
     }
     generateHtml() {
         super.generateHtml();
@@ -111,6 +113,7 @@ const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Bas
         this.header.appendChild(this.btnWrapper);
 
         this.node.appendChild(this.header);
+        this.node.appendChild(this.activityGraph.node);
     }
     generateContentHtml() {
         this.content.node.appendChild(this.settings.node);

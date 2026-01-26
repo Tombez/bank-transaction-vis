@@ -49,3 +49,37 @@ export class Range {
 }
 
 export const capitalize = s => s.at(0).toUpperCase() + s.slice(1).toLowerCase();
+
+const WORD_SIZE = 32;
+export class BitArray {
+    constructor(length) {
+        this.length = length;
+        const ArrayType = window[`Uint${WORD_SIZE}Array`];
+        this.data = new ArrayType(Math.ceil(length / WORD_SIZE));
+    }
+    get(index) {
+        const wordIndex = index / WORD_SIZE | 0;
+        const bitIndex = index % WORD_SIZE;
+        return this.data[wordIndex] >> bitIndex & 1;
+    }
+    set(index, value) {
+        const wordIndex = index / WORD_SIZE | 0;
+        const bitIndex = index % WORD_SIZE;
+        value = value ? 1 : 0;
+        const bit = value << bitIndex;
+        this.data[wordIndex] = (this.data[wordIndex] & ~bit) | bit;
+    }
+    clone() {
+        let bitArray = new BitArray(0);
+        bitArray.length = this.length;
+        bitArray.data = this.data.slice();
+        return bitArray;
+    }
+    orEquals(bitArray) {
+        const end = Math.min(this.data.length, bitArray.data.length);
+        for (let i = 0; i < end; ++i) {
+            this.data[i] |= bitArray.data[i];
+        }
+    }
+    static WORD_SIZE = WORD_SIZE;
+}

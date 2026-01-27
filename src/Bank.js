@@ -28,7 +28,7 @@ export class Bank extends Addable(Named) {
             titleType: 'h2',
             titleClass: 'bank-title'
         });
-        this.accounts = [];
+        this.accounts = this.children;
         this.isFullyFilled = false;
 
         makeDroppable(this.node, data => {
@@ -81,14 +81,6 @@ export class Bank extends Addable(Named) {
             account.node.parentNode.removeChild(account.node);
         }
         this.checkFullyFilled();
-    }
-    checkFullyFilled() {
-        this.isFullyFilled = this.accounts.every(a => a.isFullyFilled);
-        if (this.hasNode) {
-            if (this.isFullyFilled) {
-                this.header.classList.add('fully-filled');
-            } else this.header.classList.remove('fully-filled');
-        }
     }
     checkDuplicateAccountName(accountA) {
         const indexA = this.accounts.indexOf(accountA);

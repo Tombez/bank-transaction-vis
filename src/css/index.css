@@ -6,6 +6,8 @@ html {
     --drag-color: #423946;
     --header-color: #111113;
     --main-gradient: radial-gradient(rgb(35, 35, 45), rgb(20, 20, 25));
+    --incomplete-color: orange;
+    --complete-color: #00F300;
     scrollbar-color: var(--drag-color) var(--main-bg-color);
     scrollbar-width: thin;
     color-scheme: dark;
@@ -149,10 +151,10 @@ td, th {
     -webkit-user-select: none;
 }
 .emoji {
-    color: orange;
+    color: var(--incomplete-color);
 }
 .header.fully-filled .emoji {
-    color: #00F300;
+    color: var(--complete-color);
 }
 .btn-wrapper {
     display: flex;
@@ -254,6 +256,14 @@ td, th {
 #bank-list {
     margin-left: 8px;
     max-width: 800px;
+}
+.bank-container {
+    transition: height 1s;
+    interpolate-size: normal;
+}
+.transaction-file-container > .header:not(.fully-filled) .icon-edit,
+:not(.transaction-file-container) > .header:not(.fully-filled) .icon-expand {
+    border: 1px solid var(--incomplete-color);
 }
 .no-select {
     -webkit-user-select: none; /* Safari */
@@ -382,7 +392,7 @@ label[for="transaction-input"] {
     top: 0;
     width: 95%;
     margin-top: 0;
-    min-height: 1px;
+    height: 1px;
     margin-left: 2.5%;
 }
 

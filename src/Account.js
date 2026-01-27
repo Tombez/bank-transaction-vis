@@ -10,7 +10,7 @@ export class Account extends Named {
             titleType: 'h3',
             titleClass: 'acc-title',
         });
-        this.transactionFiles = [];
+        this.transactionFiles = this.children;
         this.headerFormats = [];
         this.isFullyFilled = false;
         this.changed();
@@ -69,14 +69,6 @@ export class Account extends Named {
         if (this.hasNode) this.node.dispatchEvent(changeEvent);
         else if (this.bank && this.bank.hasNode)
             this.bank.node.dispatchEvent(changeEvent);
-    }
-    checkFullyFilled() {
-        this.isFullyFilled = this.transactionFiles.every(t => t.isFullyFilled);
-        if (this.hasNode) {
-            if (this.isFullyFilled) {
-                this.header.classList.add('fully-filled');
-            } else this.header.classList.remove('fully-filled');
-        }
     }
     encode() {
         return {

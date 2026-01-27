@@ -11,8 +11,9 @@ import {Account} from './Account.js';
 import {Bank} from './Bank.js';
 import {TabBar} from './TabBar.js';
 import TransactionViewer from './TransactionViewer.js';
-import {Range, best, BitArray} from './utils.js';
+import {Range, best, BitArray, debounceFunc} from './utils.js';
 
+const COMPILE_COOLDOWN = 50;
 const canvasSize = {x: 800, y: 800};
 const graphs = [];
 let textInp;
@@ -21,6 +22,7 @@ let addBankBtn;
 let exportBtn;
 let classifiers = [];
 let bankList = window.bankList = [];
+let banksRoot = {children: bankList};
 let transactionTab = null;
 let compileCounter = 0;
 
@@ -40,22 +42,31 @@ const removeGraphs = () => {
 };
 
 const transactionInputChange = event => {
+    let promises = [];
     for (const file of [...event.target.files]) {
-        const isBtv = /\.btv$/.test(file.name);
-        if (/^text\/(csv|plain)$/.test(file.type) || isBtv) {
-            file.arrayBuffer = file.arrayBuffer();
-            let reader = new FileReader();
-            reader.onload = event => {
-                const text = event.target.result;
-                if (isBtv) {
-                    readBtv(text);
-                } else {
-                    loadCsvFile(file, text);
-                }
-            };
-            reader.readAsText(file);
+        file.isBtv = /\.btv$/.test(file.name);
+        if (/^text\/(csv|plain)$/.test(file.type) || file.isBtv) {
+            promises.push(new Promise((resolve) => {
+                file.arrayBuffer = file.arrayBuffer();
+                let reader = new FileReader();
+                reader.file = file;
+                reader.onload = resolve;
+                reader.readAsText(file);
+            }));
         }
     }
+    Promise.all(promises).then((events) => {
+        for (const {target} of events) {
+            const text = target.result;
+            const file = target.file;
+            if (file.isBtv) {
+                readBtv(text);
+            } else {
+                loadCsvFile(file, text);
+            }
+        }
+        compileTransactions();
+    });
     event.target.value = "";
 };
 
@@ -69,7 +80,6 @@ const readBtv = (text) => {
             addBank(bank);
             bank.node.querySelector('.icon-collapse')?.click();
         }
-        compileTransactions();
     } catch (error) {
         console.error(error);
         alert('Failed to read btv file, ' + error);
@@ -162,8 +172,6 @@ const loadCsvFile = (file, text) => {
     if (!tranFiles.length) tranFiles.push(firstFile);
     for (const tranFile of tranFiles)
         addTransactionFile(tranFile);
-
-    compileTransactions();
 };
 const addBank = (bank) => {
     bankList.push(bank);
@@ -211,24 +219,18 @@ const addTransactionFile = (tranFile) => {
     }
     account.addTransactionFile(tranFile);
 };
-const compileTransactions = (filters = []) => {
+const compileTransactions = () => {
+    debounceFunc(compileTransactionsDebounced, COMPILE_COOLDOWN);
+};
+const compileTransactionsDebounced = () => {
     console.debug('compile', compileCounter++);
-    let transactions = [];
-    for (const bank of bankList) {
-        for (const account of bank.accounts) {
-            account.transactions = [];
-            for (const tranFile of account.transactionFiles) {
-                if (!tranFile.isFullyFilled) continue;
-                const fileTransactions = tranFile.getTransactions();
-                tranFile.transactions = fileTransactions;
-                for (const t of fileTransactions) {
-                    transactions.push(t);
-                    account.transactions.push(t);
-                }
-            }
-        }
-    }
+    Bank.prototype.compile.apply(banksRoot);
+    let transactions = banksRoot.transactions;
     transactions.sort((a, b) => a.timestamp - b.timestamp);
+
+    const bankListDiv = document.querySelector('#bank-list');
+    for (const bank of bankList) bankListDiv.appendChild(bank.node);
+
     removeGraphs();
 
     const tViewer = recreateTViewer(transactions);
@@ -239,11 +241,12 @@ const compileTransactions = (filters = []) => {
     loadTransactions(transactions);
     calculateDailyBalances(accounts);
     
-    const stampRange = Range.fromRanges(accounts.map(a => a.stampRange));
-    const balRange = Range.fromRanges(accounts.map(a => a.balRange));
+    const accountsWithTs = accounts.filter(a => a.transactions.length);
+    const stampRange = Range.fromRanges(accountsWithTs.map(a => a.stampRange));
+    const balRange = Range.fromRanges(accountsWithTs.map(a => a.balRange));
     
-    makeBalancesGraph(accounts, tViewer, stampRange, balRange);
-    makeNetWorthGraph(accounts, stampRange, balRange);
+    makeBalancesGraph(accountsWithTs, tViewer, stampRange, balRange);
+    makeNetWorthGraph(accountsWithTs, stampRange, balRange);
     updateActivityGraphs(bankList, stampRange);
 };
 const recreateTViewer = (transactions) => {
@@ -261,13 +264,6 @@ const loadTransactions = (transactions) => {
         if (isNaN(t.amount)) debugger;
     });
 
-    for (const t of transactions) {
-        t.timestamp = +t.date;
-        t.year = t.date.getFullYear();
-        t.month = t.date.getMonth + 1;
-        t.quarter = (t.month - 1) / 3 | 0;
-        t.day = t.date.getDate();
-    }
     const filterCustom = (start, end) =>
         transactions.filter(t => t.timestamp >= start && t.timestamp < end);
     
@@ -308,6 +304,7 @@ const loadTransactions = (transactions) => {
 };
 const calculateDailyBalances = (accounts) => {
     for (const account of accounts) {
+        if (!account.transactions.length) continue;
         const dailyChange = account.dailyChange = new Map();
         for (const t of account.transactions) {
             let bal = dailyChange.get(t.timestamp) || 0;
@@ -315,8 +312,7 @@ const calculateDailyBalances = (accounts) => {
         }
 
         const dailyChangeEntries = Array.from(dailyChange.entries());
-        const stamps = Array.from(dailyChange.keys());
-        const stamp = account.stampRange = Range.fromValues(stamps);
+        const stamp = account.stampRange;
         let dailyBalance = account.dailyBalance = [];
         Date.msDay = 1000 * 60 * 60 * 24;
         let i = 0;

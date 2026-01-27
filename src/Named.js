@@ -1,4 +1,4 @@
-import {capitalize} from './utils.js';
+import {capitalize, Range} from './utils.js';
 import {LazyHtmlMixin, LazyHtml} from './LazyHtml.js';
 import memoMixin from './memoMixin.js';
 import ActivityGraph from './graphs/ActivityGraph.js';
@@ -23,7 +23,7 @@ const Settings = class extends LazyHtmlMixin(Map) {
         const isSelect = type == 'select';
         const tagName = isSelect ? 'select' : 'input';
         const tagEnd = isSelect ? `>${
-            options.map((op, i) => `<option value=${i}>${op}</option>`).join()
+            options.map((op, i) => `<option value=${i-1}>${op}</option>`).join()
         }</select>` : '/>';
         frag.innerHTML = `<label for="${id}">
             ${settingText}
@@ -37,7 +37,6 @@ const Settings = class extends LazyHtmlMixin(Map) {
                 if (event.target.type == 'checkbox')
                     event.target.value = event.target.checked;
                 let value = event.target.value;
-                if (isSelect) value--;
                 this.set(name, event.target.value);
                 if (typeof events[eventName] == 'function')
                     events[eventName](event);
@@ -57,7 +56,6 @@ const Settings = class extends LazyHtmlMixin(Map) {
         for (let [key, value] of this.entries()) {
             const input = this.inputs[key];
             if (input) {
-                if (input.tagName == 'SELECT') value++;
                 input.value = value;
                 if (input.type === 'checkbox') input.checked = value;
             }
@@ -94,6 +92,7 @@ const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Bas
         }}));
         
         this.name = name;
+        this.children = [];
         this.activityGraph = new ActivityGraph();
     }
     generateHtml() {
@@ -133,6 +132,29 @@ const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Bas
         const event = new CustomEvent('rename', {detail: this, bubbles: true});
         this.node.dispatchEvent(event);
     }
+    checkFullyFilled() {
+        this.isFullyFilled = this.children.every(c => c.isFullyFilled);
+        this.updateFilledStyle();
+    }
+    updateFilledStyle() {
+        if (this.hasNode) {
+            if (this.isFullyFilled) {
+                this.header.classList.add('fully-filled');
+            } else this.header.classList.remove('fully-filled');
+        }
+    }
+    compile() {
+        for (const child of this.children) child.compile();
+        const hasRange = this.children.filter(c => c.stampRange);
+        this.transactions = this.children.map(c => c.transactions).flat();
+        if (!hasRange.length) return;
+        
+        this.stampRange = Range.fromRanges(hasRange.map(c => c.stampRange));
+        const dfault = new Range(this.stampRange.min, this.stampRange.min);
+        const orderPos = r => (r || dfault).max;
+        this.children.sort(({stampRange: a}, {stampRange: b}) =>
+            orderPos(b) - orderPos(a));
+    }
     get name() {
         return this.settings.get(this.#nameSettingName);
     }
@@ -157,10 +179,12 @@ const Collapsable = memoMixin(Base => class extends Base {
         collapseBtn.addEventListener('click', event => {
             if (!this.content.hasNode || this.content.node.hidden) {
                 this.content.node.hidden = false;
+                collapseBtn.classList.remove('icon-expand');
                 collapseBtn.classList.add('icon-collapse');
             } else {
                 this.content.node.hidden = true;
                 collapseBtn.classList.remove('icon-collapse');
+                collapseBtn.classList.add('icon-expand');
             }
         });
     }
@@ -202,11 +226,13 @@ const Editable = memoMixin(Base => class extends Base {
                 const expandBtn = this.header.querySelector('.icon-expand:not(.icon-collapse)');
                 if (expandBtn) expandBtn.click();
                 this.settings.node.hidden = false;
+                editBtn.classList.remove('icon-edit');
                 editBtn.classList.add('icon-done');
                 if (deleteBtn) deleteBtn.hidden = false;
             } else {
                 this.settings.node.hidden = true;
                 editBtn.classList.remove('icon-done');
+                editBtn.classList.add('icon-edit');
                 if (deleteBtn) deleteBtn.hidden = true;
             }
         });

@@ -34,10 +34,17 @@ export class Range {
     isEqual(range) {
         return this.min == range.min && this.max == range.max;
     }
+    getMidpoint() {
+        return this.min + this.diff / 2;
+    }
     static fromValues(values) {
+        if (!values.length)
+            throw new Error('Cannot create Range from no values.');
         return new Range(best(values), best(values, a => a, 'max'));
     }
     static fromRanges(ranges) {
+        if (!ranges.length)
+            throw new Error('Cannot create Range from no ranges.');
         let min = Infinity;
         let max = -Infinity;
         for (const range of ranges) {
@@ -83,3 +90,14 @@ export class BitArray {
     }
     static WORD_SIZE = WORD_SIZE;
 }
+
+const debounceFuncs = new Set();
+export const debounceFunc = (func, cooldown = 100) => {
+    if (!debounceFuncs.has(func)) {
+        debounceFuncs.add(func);
+        window.setTimeout(() => {
+            debounceFuncs.delete(func);
+            func();
+        }, cooldown);
+    }
+};

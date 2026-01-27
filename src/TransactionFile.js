@@ -3,6 +3,7 @@ import {Csv, CSV_DATA_TYPES} from './Csv.js';
 import {CsvViewer} from './CsvViewer.js';
 import {fromDateString, dateToMdy} from './date-utils.js';
 import {makeDraggable} from './dragAndDrop.js';
+import {Range} from './utils.js';
 
 const sanitize$Text = text => text.replaceAll(/[^-\d\.]/g, "");
 
@@ -45,6 +46,7 @@ export class TransactionFile extends Named {
             this.settings.set('hasHeader', checked);
         }});
         this.settings.set('hasHeader', csv.hasHeader);
+        this.transactions = [];
 
         // Add Column Settings
         const colOptions = ['Unset', ...(csv.headings || csv.rows[0])];
@@ -85,17 +87,18 @@ export class TransactionFile extends Named {
         this.content.node.appendChild(viewer.node);
     }
     identifyCols() {
-        const indices = this.csv.headings.map((_,i) => i);
         if (this.csv.hasHeader) {
             // Column Identification By Name
+            const indices = this.csv.headings.map((_,i) => i);
             for (const [type, name, regex] of colSearches) {
                 if (this.settings.has(name)) continue;
 
                 let colIndices = indices
                     .filter(i =>
                         regex.test(this.csv.headings[i]) &&
-                        this.csv.colTypes[i].size == 1 &&
-                        Array.from(this.csv.colTypes[i].values())[0] == type);
+                        (i > this.csv.colTypes.length - 1 ||
+                        (this.csv.colTypes[i].size == 1 &&
+                        Array.from(this.csv.colTypes[i].values())[0] == type)));
                 if (!colIndices.length) continue;
                 
                 this.settings.set(name, colIndices[0]);
@@ -112,17 +115,18 @@ export class TransactionFile extends Named {
                     this.settings.set('cdIndicator', cdIndicator);
                 }
             }
-        } else {
-            
         }
 
-        // Column Identification by type
-        for (const [type, name] of colSearches) {
-            if (this.settings.has(name)) continue;
-            let colIndices = indices.filter(i =>
-                this.csv.colTypes[i].size == 1 &&
-                Array.from(this.csv.colTypes[i].values())[0] == type);
-            if (colIndices.length == 1) this.settings.set(name, colIndices[0]);
+        if (this.csv.rows.length) {
+            // Column Identification by type
+            const indices = this.csv.rows[0].map((_, i) => i);
+            for (const [type, name] of colSearches) {
+                if (this.settings.has(name)) continue;
+                let colIndices = indices.filter(i =>
+                    this.csv.colTypes[i].size == 1 &&
+                    Array.from(this.csv.colTypes[i].values())[0] == type);
+                if (colIndices.length == 1) this.settings.set(name, colIndices[0]);
+            }
         }
         this.settings.updateInputs();
         this.settingChanged();
@@ -139,11 +143,7 @@ export class TransactionFile extends Named {
     checkFullyFilled() {
         this.isFullyFilled = colSearches.every(([, name]) =>
             this.settings.has(name) && this.settings.get(name) > -1);
-        if (this.hasNode) {
-            if (this.isFullyFilled) {
-                this.header.classList.add('fully-filled');
-            } else this.header.classList.remove('fully-filled');
-        }
+        super.updateFilledStyle();
     }
     getSimplifiedCsv(accountName) {
         const simpleCsv = this.csv.makeReorder([
@@ -192,7 +192,21 @@ export class TransactionFile extends Named {
             const amount = isDebit ? debit : credit;
             transactions.push(new Transaction(date, desc, amount, row, this));
         }
-        return transactions;
+        for (const t of transactions) {
+            t.timestamp = +t.date;
+            t.year = t.date.getFullYear();
+            t.month = t.date.getMonth + 1;
+            t.quarter = (t.month - 1) / 3 | 0;
+            t.day = t.date.getDate();
+        }
+        return this.transactions = transactions;
+    }
+    compile() {
+        if (!this.isFullyFilled) return;
+        this.getTransactions();
+        const stamps = this.transactions.map(t => t.timestamp);
+        if (stamps.length)
+            this.stampRange = Range.fromValues(stamps);
     }
     encode() {
         return {

@@ -142,7 +142,7 @@ export default class FlowGraph extends Graph {
                 const text = piece.name + " $" + Math.round(piece.total).toLocaleString();
                 const pad = 3; // pixels
 
-                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.setFontSize(fontSize, true);
                 const backdropW = ctx.measureText(text).width + pad * 2
                 const backdropH = fontSize + pad * 2;;
 
@@ -156,7 +156,7 @@ export default class FlowGraph extends Graph {
             }
         }
 
-        ctx.font = "bold 18px Arial";
+        ctx.setFontSize(18, true);
         ctx.textBaseline = "top";
         ctx.fillStyle = "#fff";
         ctx.fillText(this.title, this.canvas.width / 2, 5);

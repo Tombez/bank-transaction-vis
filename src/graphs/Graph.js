@@ -31,7 +31,7 @@ export class Graph extends LazyHtml {
         this.ctx.width = this.canvas.width = this.size.x;
         this.ctx.height = this.canvas.height = this.size.y;
         this.ctx.temp = function (cb) {this.save(); cb(); this.restore()};
-        this.fontName = 'Arial, sans-serif';
+        this.ctx.fontName = '"Ubuntu Sans Mono", sans-serif';
         this.ctx.setFontSize = function(size, bold) {
             this.font = `${bold ? 'bold ' : ''}${size}px ${this.fontName}`;
             this.fontSize = size;

@@ -101,7 +101,7 @@ export class LineGraph extends Graph {
             ctx.fillStyle = "white";
             ctx.textAlign = "right";
             ctx.textBaseline = "middle";
-            ctx.setFontSize(22, true);
+            ctx.setFontSize(22);
             ctx.globalAlpha = 0.2;
             const yStep = 2000;
             ctx.beginPath();
@@ -160,21 +160,21 @@ export class LineGraph extends Graph {
                 const label = `'${new Date(x).getFullYear()-2000}`;
                 drawLabel(label, x);
                 if (drawQ3s) {
-                    ctx.setFontSize(ctx.fontSize - 3, true);
+                    ctx.setFontSize(ctx.fontSize - 3);
                     drawLabel('Q3', +new Date(year, 6, 1));
                     if (drawEvenQs) {
                         drawLabel('Q2', +new Date(year, 3, 1));
                         drawLabel('Q4', +new Date(year, 9, 1));
                     }
                     if (drawMonths) {
-                        ctx.setFontSize(ctx.fontSize - 4, true);
+                        ctx.setFontSize(ctx.fontSize - 4);
                         for (const month of [1, 2, 4, 5, 7, 8, 10, 11]) {
                             const date = new Date(year, month, 1);
                             drawLabel(getMonthName(date), +date);
                         }
                     }
                 }
-                ctx.setFontSize(22, true);
+                ctx.setFontSize(22);
             }
             ctx.stroke();
             ctx.globalAlpha = 1;
@@ -204,7 +204,6 @@ export class LineGraph extends Graph {
         ctx.textAlign = 'center';
         ctx.setFontSize(26, true);
         ctx.fillText(this.title, x, 20);
-        ctx.setFontSize(22, true);
         ctx.globalAlpha = 1;
     
         // Draw Graph Key:
@@ -212,7 +211,7 @@ export class LineGraph extends Graph {
             this.verticalIntersections.map(({line, label}) => [line, label]) :
             this.values.map((line, i) => [line, this.labels[i]]);
         const keyFontSize = 18;
-        ctx.setFontSize(keyFontSize, true);
+        ctx.setFontSize(keyFontSize);
         const boxMargin = 10;
         const keyBoxSize = 10;
         const margin = 4;

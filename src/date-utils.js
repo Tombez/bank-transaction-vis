@@ -1,3 +1,6 @@
+export const MS_DAY = 1000 * 60 * 60 * 24;
+export const MS_WEEK = MS_DAY * 7;
+
 export const dateValToMdy = (n, sep) => {
     const date = new Date(n);
     return dateToMdy(date, sep);
@@ -22,9 +25,9 @@ export const fromDateString = (dateStr) => {
     if (isDateWritten(dateStr)) return new Date(dateStr);
     if (isDateNumerical(dateStr)) {
         const separator = dateStr.match(/[^\d]/);
-        let [m,d,y] = dateStr.split(separator);
+        let [m, d, y] = dateStr.split(separator);
         if (isYmd(dateStr)) [m, d, y] = [d, y, m];
-        return new Date(y,m-1,d);
+        return new Date(y, m-1, d);
     }
     throw new Error(`'${dateStr}' is not a recognized date format.`);
 };
@@ -50,6 +53,11 @@ export const padYearMdy = (mdy, millenium = "20") => {
 };
 export const nowString = () => {
     const now = new Date();
-    const millis = now % (1000 * 60 * 60 * 24);
+    const millis = now % MS_DAY;
     return dateValToMdy(now, "-") + "-" + millis;
+};
+export const getWeek = (date) => {
+    if (typeof(date) == 'number') date = new Date(date);
+    const day = date.getDate() - date.getDay();
+    return new Date(date.getFullYear(), date.getMonth(), day) / MS_WEEK | 0;
 };

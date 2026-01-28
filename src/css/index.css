@@ -22,7 +22,7 @@ html, body {
 body {
     background-color: var(--main-bg-color);
     color: var(--main-color);
-    font: 18px Ubuntu, sans-serif;
+    font: 18px "Ubuntu Sans Mono", sans-serif;
     position: relative;
     display: flex;
     flex-direction: column;
@@ -98,7 +98,7 @@ canvas {
 table {
     border-collapse: separate;
     border-spacing: 0;
-    font-family: "Ubuntu", system-ui;
+    font-family: "Ubuntu Sans Mono", system-ui;
 }
 table th {
     border-top: 1px solid var(--main-color);
@@ -392,7 +392,7 @@ label[for="transaction-input"] {
     top: 0;
     width: 95%;
     margin-top: 0;
-    height: 1px;
+    height: 7px;
     margin-left: 2.5%;
 }
 

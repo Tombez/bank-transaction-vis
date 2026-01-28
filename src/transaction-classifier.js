@@ -397,13 +397,13 @@ const updateActivityGraphs = (banks, range) => {
             for (const tranFile of account.transactionFiles) {
                 days.data.fill(0);
                 ActivityGraph.populateDays(days, tranFile.transactions, range);
-                tranFile.activityGraph?.update(days);
+                tranFile.activityGraph?.update(days, range);
                 accSum.orEquals(days);
             }
-            account.activityGraph?.update(accSum);
+            account.activityGraph?.update(accSum, range);
             bankSum.orEquals(accSum);
         }
-        bank.activityGraph.update(bankSum);
+        bank.activityGraph.update(bankSum, range);
     }
 };
 

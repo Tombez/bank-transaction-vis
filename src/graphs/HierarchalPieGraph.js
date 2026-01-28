@@ -143,7 +143,7 @@ export default class HierarchyGraph extends Graph {
 
         // Draw Center Total:
         this.ctx.fillStyle = "#fff";
-        this.ctx.font = "bold 20px Arial";
+        this.ctx.setFontSize(20, true);
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "bottom";
         this.ctx.fillText(`Total`, 0, 0);
@@ -171,36 +171,36 @@ export default class HierarchyGraph extends Graph {
         }
     }
     drawText() {
-        this.ctx.fillStyle = "#fff";
-        this.ctx.strokeStyle = "#000";
+        const ctx = this.ctx;
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "#000";
 
-        this.ctx.textAlign = "center";
-        this.ctx.textBaseline = "middle";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
         for (let cur of this.texts) {
             const {text, home, drawLoc, angle} = cur;
-            const fontSize = 20;
-            this.ctx.font = `bold ${fontSize}px Arial`;
+            ctx.setFontSize(20, true);
 
-            this.ctx.beginPath();
-            this.ctx.lineWidth = 2.5;
-            this.ctx.strokeStyle = "#000";
-            this.ctx.moveTo(home.x, home.y);
-            this.ctx.lineTo(drawLoc.x, drawLoc.y);
-            this.ctx.stroke();
+            ctx.beginPath();
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = "#000";
+            ctx.moveTo(home.x, home.y);
+            ctx.lineTo(drawLoc.x, drawLoc.y);
+            ctx.stroke();
 
-            this.ctx.lineWidth = 1;
-            this.ctx.strokeStyle = "#fff";
-            this.ctx.stroke();
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = "#fff";
+            ctx.stroke();
 
-            this.ctx.save();
-            this.ctx.translate(drawLoc.x, drawLoc.y);
-            this.ctx.rotate(angle);
-            this.ctx.lineWidth = 0.8 * fontSize / 20;
-            this.ctx.strokeStyle = "#000";
-            this.ctx.fillText(text, 0, 0);
-            this.ctx.strokeText(text, 0, 0);
+            ctx.save();
+            ctx.translate(drawLoc.x, drawLoc.y);
+            ctx.rotate(angle);
+            ctx.lineWidth = 0.8 * ctx.fontSize / 20;
+            ctx.strokeStyle = "#000";
+            ctx.fillText(text, 0, 0);
+            ctx.strokeText(text, 0, 0);
 
-            this.ctx.restore();
+            ctx.restore();
         }
     }
     drawHoverBox() {
@@ -210,7 +210,7 @@ export default class HierarchyGraph extends Graph {
         const margin = 1.05;
         const wMargin = 5;
 
-        this.ctx.font = `${textSize}px Arial`;
+        this.ctx.setFontSize(textSize);
         const width = this.hoverBox.lines.reduce((max, cur) =>
             Math.max(max, this.ctx.measureText(cur).width), -Infinity) + wMargin * 2;
         const height = textSize * margin * this.hoverBox.lines.length;

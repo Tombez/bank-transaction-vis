@@ -4,8 +4,7 @@ import {dateToYmd} from './date-utils.js';
 
 export default class TransactionViewer extends CsvViewer {
     constructor(transactions) {
-        const csv = new Csv('', true);
-        csv.headings = 'Bank,Account,Date,Description,Amount'.split(',');
+        const csv = new Csv('Bank,Account,Date,Description,Amount', true);
         super(csv);
         this.transactions = transactions;
         this.filters = [];

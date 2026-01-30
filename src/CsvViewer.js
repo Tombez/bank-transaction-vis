@@ -1,20 +1,20 @@
 import {LazyHtml} from './LazyHtml.js';
 import {Csv, CSV_DATA_TYPES} from './Csv.js';
 
-const typeText = (typesArray, i) => {
-    if (!typesArray || i >= typesArray.length) return 'Unknown';
-    const types = typesArray[i];
-    if (types.size > 1) return 'Mixed';
-
-    switch (Array.from(types.values())[0]) {
+const typeText = (type) => {
+    switch (type) {
         case CSV_DATA_TYPES.EMPTY:
             return 'Empty';
         case CSV_DATA_TYPES.NUMBER:
             return 'Number';
         case CSV_DATA_TYPES.DATE:
             return 'Date';
-        default:
+        case CSV_DATA_TYPES.STRING:
             return 'String';
+        case CSV_DATA_TYPES.MIXED:
+            return 'Mixed';
+        default:
+            return 'Unknown';
     }
 };
 
@@ -36,8 +36,11 @@ export class CsvViewer extends LazyHtml {
             this.csv.headings
             ?
             `<tr>
-            ${this.csv.headings.map((h, i) => `
-                <th scope="col">${h}<span class="col-type">${typeText(this.csv.colTypes, i)}</span></th>
+            ${this.csv.headings.map((h) => `
+                <th scope="col">${h.text}
+                <span class="col-type">${typeText(h.type)}</span>
+                <span class="sparse-descriptor">${h.isSparse ? 'Sparse' : ''}</span>
+                </th>
             `).join('\n')}
             </tr>`
             :

@@ -47,7 +47,8 @@ export const CSV_DATA_TYPES = {
     EMPTY: 0,
     NUMBER: 1,
     DATE: 2,
-    STRING: 3
+    STRING: 3,
+    MIXED: 4
 };
 
 export const typeOf = str => {
@@ -63,8 +64,8 @@ export class Csv {
         if (linesToSkip) this.rows.splice(0, linesToSkip);
         this.hasHeader = hasHeader === undefined ? this.detectHeader() :
             hasHeader;
+        
         this.headings = this.hasHeader ? this.rows.shift() : null;
-        this.colTypes = [];
         this.update();
     }
     detectHeader() {
@@ -75,12 +76,30 @@ export class Csv {
     }
     update() {
         if (!this.rows.length) return;
-        this.colTypes = this.rows[0].map(() => new Set());
+
+        if (!this.headings) {
+            const colCount = this.rows[0].length;
+            this.headings = Array.from({length: colCount}, () => '');
+        }
+        if (this.headings.length && typeof this.headings[0] == 'string') {
+            this.headings = this.headings.map(text => new CsvHeading(text));
+        }
+
+        const colTypes = this.rows[0].map(() => new Set());
         for (const row of this.rows) {
             for (let x = 0; x < row.length; ++x) {
-                this.colTypes[x].add(typeOf(row[x]));
+                colTypes[x].add(typeOf(row[x]));
             }
         }
+
+        this.headings.forEach((heading, i) => {
+            const types = colTypes[i];
+            heading.isSparse = types.has(CSV_DATA_TYPES.EMPTY);
+            if (heading.isSparse && types.size > 1)
+                types.delete(CSV_DATA_TYPES.EMPTY);
+            heading.type = types.size == 1 ?
+                [...types.values()][0] : CSV_DATA_TYPES.MIXED;
+        });
     }
     makeReorder(columns) {
         let csv = new Csv();
@@ -105,12 +124,14 @@ export class Csv {
     clone() {
         let clone = new Csv();
         clone.hasHeader = this.hasHeader;
-        clone.headings = this.headings.slice();
+        clone.headings = this.headings.map(h => h.text);
         clone.rows = this.rows.map(row => row.slice());
+        clone.update();
         return clone;
     }
     toString() {
-        const headerText = this.hasHeader ? this.headings.join(",") + "\n" : "";
+        const headerText = this.hasHeader ?
+            this.headings.map(h => h.text).join(",") + "\n" : "";
         return headerText + this.rows.map(
             row => row.map(Csv.escapeValue).join(","))
             .join("\n");
@@ -119,5 +140,13 @@ export class Csv {
         return /["\n,]/g.test(value) ?
             `"${value.replaceAll('"', '""')}"` :
             value;
+    }
+}
+
+class CsvHeading {
+    constructor(text, type, isSparse) {
+        this.text = text;
+        this.type = type;
+        this.isSparse = isSparse;
     }
 }

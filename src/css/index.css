@@ -127,6 +127,11 @@ td, th {
     font-size: 0.8em;
     display: block;
 }
+.sparse-descriptor {
+    color: #999;
+    font-size: 0.6em;
+    display: block;
+}
 .sticky-header {
     position: sticky;
     top: 0;

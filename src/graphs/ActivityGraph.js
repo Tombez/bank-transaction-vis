@@ -10,8 +10,9 @@ export default class ActivityGraph extends Graph {
     generateHtml() {
         super.generateHtml();
         this.canvas.classList.add('activity-graph');
+        this.canvas.title = 'Activity Graph';
     }
-    update(days, range) {
+    update(days, range, balancePoints) {
         if (!this.hasNode) this.generateHtml();
         const weekRange = new Range(getWeek(range.min), getWeek(range.max));
         const weekCount = weekRange.diff + 1;
@@ -19,9 +20,10 @@ export default class ActivityGraph extends Graph {
         this.canvas.height = this.size.y = 7;
 
         this.hasChanged = true;
-        this.draw(days, new Date(range.min).getDay(), weekCount);
+        this.draw(days, new Date(range.min).getDay(), weekCount, range,
+            balancePoints);
     }
-    draw(days, startY, weekCount) {
+    draw(days, startY, weekCount, range, balancePoints) {
         const ctx = this.ctx;
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, this.size.x, this.size.y);
@@ -33,7 +35,16 @@ export default class ActivityGraph extends Graph {
                     ctx.fillRect(x, y, 1, 1);
                 }
             }
-            
+        }
+
+        if (balancePoints) {
+            ctx.fillStyle = '#2c64cc';
+            for (const {timestamp, balance} of balancePoints) {
+                const index = (timestamp - range.min) / MS_DAY | 0 + startY;
+                const x = index / 7 | 0;
+                const y = index % 7;
+                ctx.fillRect(x, y, 1, 1);
+            }
         }
     }
     static populateDays(days, transactions, range) {

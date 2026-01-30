@@ -11,14 +11,14 @@ const Settings = class extends LazyHtmlMixin(Map) {
         this.fragments = [];
     }
     settingChanged(event) {}
-    add(type, name, settingText, events, options) {
+    add(type, name, settingText, events, options, required) {
         const unique = `${Date.now() % 1e8}-${Math.random() * 1e8 | 0}`;
         const id = `setting-${unique}`;
-        const obj = {id, type, name, settingText, events, options};
+        const obj = {id, type, name, settingText, events, options, required};
         if (this.hasNode) this.generateSetting(obj);
         else this.#settings.push(obj);
     }
-    generateSetting({id, type, name, settingText, events, options}) {
+    generateSetting({id, type, name, settingText, events, options, required}) {
         const frag = document.createElement('div');
         const isSelect = type == 'select';
         const tagName = isSelect ? 'select' : 'input';
@@ -26,7 +26,7 @@ const Settings = class extends LazyHtmlMixin(Map) {
             options.map((op, i) => `<option value=${i-1}>${op}</option>`).join()
         }</select>` : '/>';
         frag.innerHTML = `<label for="${id}">
-            ${settingText}
+            ${settingText}${required ? '<span class="required">*</span>' : ''}
             <${tagName} class="setting" id="${id}" type="${type}"${tagEnd}
         </label>`;
         this.node.appendChild(frag);
@@ -148,7 +148,7 @@ const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Bas
         const hasRange = this.children.filter(c => c.stampRange);
         this.transactions = this.children.map(c => c.transactions).flat();
         if (!hasRange.length) return;
-        
+
         this.stampRange = Range.fromRanges(hasRange.map(c => c.stampRange));
         const dfault = new Range(this.stampRange.min, this.stampRange.min);
         const orderPos = r => (r || dfault).max;

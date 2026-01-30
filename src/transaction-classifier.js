@@ -200,7 +200,7 @@ const addTransactionFile = (tranFile) => {
         bank => account = bank.accounts.find(a => a.name == tranFile.name));
     if (!account && tranFile.csv.hasHeader) {
         // Identify account based on csv header
-        const header = tranFile.csv.headings.join();
+        const header = tranFile.csv.headings.map(h => h.text).join();
         bank = bankList.find(
             bank => account = bank.accounts.find(
                 a => a.headerFormats.includes(header)));
@@ -242,6 +242,8 @@ const compileTransactionsDebounced = () => {
     calculateDailyBalances(accounts);
     
     const accountsWithTs = accounts.filter(a => a.transactions.length);
+    if (!accountsWithTs.length) return;
+
     const stampRange = Range.fromRanges(accountsWithTs.map(a => a.stampRange));
     const balRange = Range.fromRanges(accountsWithTs.map(a => a.balRange));
     
@@ -397,7 +399,7 @@ const updateActivityGraphs = (banks, range) => {
             for (const tranFile of account.transactionFiles) {
                 days.data.fill(0);
                 ActivityGraph.populateDays(days, tranFile.transactions, range);
-                tranFile.activityGraph?.update(days, range);
+                tranFile.activityGraph?.update(days, range, tranFile.balancePoints);
                 accSum.orEquals(days);
             }
             account.activityGraph?.update(accSum, range);

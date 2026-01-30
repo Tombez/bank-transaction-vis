@@ -14,15 +14,48 @@ class Transaction {
         this.amount = +amount;
         this.row = row;
         this.transactionFile = transactionFile;
+
+        this.timestamp = +this.date;
+        this.year = this.date.getFullYear();
+        this.month = this.date.getMonth + 1;
+        this.quarter = (this.month - 1) / 3 | 0;
+        this.day = this.date.getDate();
     }
 }
 
+const getEndOfDayBalance = (transactions) => {
+    if (!transactions.length) return null;
+  
+    const changes = new Map();
+    for (const transaction of transactions) {
+        const away = transaction.balance - transaction.amount;
+        const to = transaction.balance;
+        const awayCount = (changes.get(away) || 0) - 1;
+        if (awayCount) changes.set(away, awayCount);
+        else changes.delete(away);
+        const toCount = (changes.get(to) || 0) + 1;
+        if (toCount) changes.set(to, toCount);
+        else changes.delete(to);
+    }
+    for (const [key, value] of changes.entries()) if (value == 1) return key;
+    return null;
+};
+
+
+
 const colSearches = [
-    [CSV_DATA_TYPES.DATE, 'date', /^((transaction|trade|post(ed|ing)|effective|booking) )?date( created)?$/i],
-    [CSV_DATA_TYPES.STRING, 'description', /^(transaction )?description$/i],
-    [CSV_DATA_TYPES.NUMBER, 'debit', /^(transaction |net )?amount|withdrawals?|debits?$/i],
-    [CSV_DATA_TYPES.NUMBER, 'credit', /^(transaction |net )?amount|deposits?|credits?$/i],
-];
+    ['date', CSV_DATA_TYPES.DATE, true,
+        /^((transaction|trade|post(ed|ing)|effective|booking) )?date( created)?$/i
+    ],
+    ['debit', CSV_DATA_TYPES.NUMBER, true,
+        /^(transaction |net )?amount|withdrawals?|debits?$/i],
+    ['credit', CSV_DATA_TYPES.NUMBER, true,
+        /^(transaction |net )?amount|deposits?|credits?$/i],
+    ['description', CSV_DATA_TYPES.STRING, false,
+        /^(transaction )?description$/i],
+    ['balance', CSV_DATA_TYPES.NUMBER, false,
+        /^(account )?balance$/i],
+].map(([name, type, required, regex]) => ({ name, type, required, regex }));
 export class TransactionFile extends Named {
     constructor(file, csv) {
         super(file.name, {
@@ -40,19 +73,22 @@ export class TransactionFile extends Named {
                 csv.headings = csv.rows.shift();
                 csv.hasHeader = true;
             } else if (!checked && csv.hasHeader) {
-                csv.rows.unshift(csv.headings);
+                csv.rows.unshift(csv.headings.map(h => h.text));
                 csv.hasHeader = false;
             }
+            csv.update();
             this.settings.set('hasHeader', checked);
         }});
         this.settings.set('hasHeader', csv.hasHeader);
         this.transactions = [];
 
         // Add Column Settings
-        const colOptions = ['Unset', ...(csv.headings || csv.rows[0])];
-        for (const [type, name, regex] of colSearches) {
+        const colOptions = ['Unset',
+            ...(csv.hasHeader ? csv.headings.map(h => h.text) : csv.rows[0])];
+        for (const {name, required} of colSearches) {
             this.settings.add('select', name,
-                `Which column contains transaction ${name}s?`, {}, colOptions);
+                `Which column contains transaction ${name}s?`, {}, colOptions,
+            required);
         }
 
         this.settings.add('checkbox', 'hasCdIndicator',
@@ -90,15 +126,12 @@ export class TransactionFile extends Named {
         if (this.csv.hasHeader) {
             // Column Identification By Name
             const indices = this.csv.headings.map((_,i) => i);
-            for (const [type, name, regex] of colSearches) {
+            for (const {type, name, regex} of colSearches) {
                 if (this.settings.has(name)) continue;
 
                 let colIndices = indices
-                    .filter(i =>
-                        regex.test(this.csv.headings[i]) &&
-                        (i > this.csv.colTypes.length - 1 ||
-                        (this.csv.colTypes[i].size == 1 &&
-                        Array.from(this.csv.colTypes[i].values())[0] == type)));
+                    .filter(i => regex.test(this.csv.headings[i].text) &&
+                        this.csv.headings[i].type == type);
                 if (!colIndices.length) continue;
                 
                 this.settings.set(name, colIndices[0]);
@@ -108,8 +141,9 @@ export class TransactionFile extends Named {
                 !this.settings.has('cdIndicator')
             ) {
                 // Check for credit/debit indicator
-                const cdIndicator = this.csv.headings.findIndex(colName =>
-                    /^(credit debit )?indicator$/i.test(colName));
+                const cdIndicator = this.csv.headings.map(h => h.text)
+                    .findIndex(colName =>
+                        /^(credit debit )?indicator$/i.test(colName));
                 if (cdIndicator > -1) {
                     this.settings.set('hasCdIndicator', true);
                     this.settings.set('cdIndicator', cdIndicator);
@@ -120,11 +154,11 @@ export class TransactionFile extends Named {
         if (this.csv.rows.length) {
             // Column Identification by type
             const indices = this.csv.rows[0].map((_, i) => i);
-            for (const [type, name] of colSearches) {
+            const required = colSearches.filter(s => s.required);
+            for (const {type, name} of required) {
                 if (this.settings.has(name)) continue;
                 let colIndices = indices.filter(i =>
-                    this.csv.colTypes[i].size == 1 &&
-                    Array.from(this.csv.colTypes[i].values())[0] == type);
+                    this.csv.headings[i].type == type);
                 if (colIndices.length == 1) this.settings.set(name, colIndices[0]);
             }
         }
@@ -141,7 +175,8 @@ export class TransactionFile extends Named {
         this.checkFullyFilled();
     }
     checkFullyFilled() {
-        this.isFullyFilled = colSearches.every(([, name]) =>
+        const required = colSearches.filter(s => s.required);
+        this.isFullyFilled = required.every(({name}) =>
             this.settings.has(name) && this.settings.get(name) > -1);
         super.updateFilledStyle();
     }
@@ -168,10 +203,10 @@ export class TransactionFile extends Named {
         }
 
         for (const row of simpleCsv.rows) {
-            const accCol = simpleCsv.headings.indexOf('Account');
+            const accCol = simpleCsv.headings.map(h => h.text).indexOf('Account');
             row[accCol] = accountName;
 
-            const dateCol = simpleCsv.headings.indexOf('Transaction Date');
+            const dateCol = simpleCsv.headings.map(h => h.text).indexOf('Transaction Date');
             row[dateCol] = dateToMdy(fromDateString(row[dateCol]));
         }
         return simpleCsv;
@@ -190,14 +225,12 @@ export class TransactionFile extends Named {
             if (isDebit && !debit.startsWith('-'))
                 debit = '-' + debit;
             const amount = isDebit ? debit : credit;
-            transactions.push(new Transaction(date, desc, amount, row, this));
-        }
-        for (const t of transactions) {
-            t.timestamp = +t.date;
-            t.year = t.date.getFullYear();
-            t.month = t.date.getMonth + 1;
-            t.quarter = (t.month - 1) / 3 | 0;
-            t.day = t.date.getDate();
+            const transaction = new Transaction(date, desc, amount, row, this);
+            const balIndex = this.settings.get('balance');
+            if (balIndex != undefined && balIndex > -1 && row[balIndex])
+                transaction.balance = sanitize$Text(row[balIndex]);
+
+            transactions.push(transaction);
         }
         return this.transactions = transactions;
     }
@@ -207,6 +240,23 @@ export class TransactionFile extends Named {
         const stamps = this.transactions.map(t => t.timestamp);
         if (stamps.length)
             this.stampRange = Range.fromValues(stamps);
+        this.balancePoints = this.getBalancePoints();
+    }
+    getBalancePoints() {
+        let points = [];
+        const hasBalTs = this.transactions.filter(t => t.balance != undefined);
+        hasBalTs.sort((a, b) => a.timestamp - b.timeStamp);
+        for (let i = 0; i < hasBalTs.length; ++i) {
+            const time = hasBalTs[i].timestamp;
+            let end = i;
+            while (end < hasBalTs.length && hasBalTs[end].timestamp == time) ++end;
+            let sameDay = hasBalTs.slice(i, end);
+            const balance = getEndOfDayBalance(sameDay);
+            if (balance != null)
+                points.push({timestamp: time, balance});
+            i = end - 1;
+        }
+        return points;
     }
     encode() {
         return {

@@ -228,7 +228,7 @@ export class TransactionFile extends Named {
             const transaction = new Transaction(date, desc, amount, row, this);
             const balIndex = this.settings.get('balance');
             if (balIndex != undefined && balIndex > -1 && row[balIndex])
-                transaction.balance = sanitize$Text(row[balIndex]);
+                transaction.balance = +sanitize$Text(row[balIndex]);
 
             transactions.push(transaction);
         }

@@ -1,5 +1,5 @@
 import {makeDraggable, makeDroppable} from './dragAndDrop.js';
-import {Named} from './Named.js';
+import {Named, getUnique} from './Named.js';
 import {TransactionFile} from './TransactionFile.js';
 
 export class Account extends Named {
@@ -14,6 +14,26 @@ export class Account extends Named {
         this.headerFormats = [];
         this.isFullyFilled = false;
         this.changed();
+        const oldGenerate = this.settings.onGenerate;
+        this.settings.onGenerate = function() {
+            if (oldGenerate) oldGenerate.apply(this);
+            const container = document.createElement('div');
+            container.className = 'balance-point-list';
+            const addBtn = document.createElement('button');
+            addBtn.innerText = 'New';
+            addBtn.addEventListener('click', () => {
+                const frag = new DocumentFragment();
+                const dateId = `setting-${getUnique()}`;
+                const balId = `setting-${getUnique()}`;
+                frag.innerHTML = `<label for="${dateId}">Date:</label>
+                    <input type="text" id="${dateId}" />
+                    <label for="${balId}">Balance:</label>
+                    <input type="text" id="${balId}" />`;
+                container.insertBefore(frag, addBtn);
+            });
+            container.appendChild(addBtn);
+            this.node.appendChild(container);
+        };
     }
     generateHtml() {
         super.generateHtml();
@@ -69,6 +89,14 @@ export class Account extends Named {
         if (this.hasNode) this.node.dispatchEvent(changeEvent);
         else if (this.bank && this.bank.hasNode)
             this.bank.node.dispatchEvent(changeEvent);
+    }
+    compile() {
+        super.compile();
+        this.balancePoints = [];
+        for (const tranFile of this.transactionFiles) {
+            if (tranFile.balancePoints) this.balancePoints = this.balancePoints
+                .concat(tranFile.balancePoints);
+        }
     }
     encode() {
         return {

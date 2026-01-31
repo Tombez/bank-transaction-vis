@@ -402,7 +402,7 @@ const updateActivityGraphs = (banks, range) => {
                 tranFile.activityGraph?.update(days, range, tranFile.balancePoints);
                 accSum.orEquals(days);
             }
-            account.activityGraph?.update(accSum, range);
+            account.activityGraph?.update(accSum, range, account.balancePoints);
             bankSum.orEquals(accSum);
         }
         bank.activityGraph.update(bankSum, range);

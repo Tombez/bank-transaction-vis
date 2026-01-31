@@ -10,12 +10,15 @@ class Filter {
     }
 }
 
-const createBalLine = (transactions) => {
+const createBalLine = (transactions, balancePoints) => {
     if (!transactions.length) return [];
     transactions.sort((a, b) => a.timestamp - b.timestamp);
+    const balMap = new Map(balancePoints.map(({timestamp, balance}) =>
+        [timestamp, balance]));
     
     let line = [];
     let bal = 0;
+    let prevKnownBalStamp = null;
     for (let i = 0; i < transactions.length;) {
         let startIndex = i;
         const stamp = transactions[startIndex].timestamp;
@@ -23,6 +26,21 @@ const createBalLine = (transactions) => {
         for (; i < transactions.length &&
             transactions[i].timestamp == stamp; ++i)
                 bal += transactions[i].amount;
+
+        const knownBal = balMap.get(stamp);
+        if (knownBal !== undefined) {
+            const diff = Math.round((bal - knownBal) * 100) / 100;
+            if (prevKnownBalStamp === null) {
+                console.debug('intial balance offset of', diff);
+                prevKnownBalStamp = stamp;
+                for (const p of line) p.y -= diff;
+            } else if (diff) {
+                const str = 'found balance difference of';
+                const account = transactions[startIndex].transactionFile.account.name;
+                console.debug(str, diff, account, new Date(stamp));
+            }
+            bal = knownBal;
+        }
         
         line.push(new Vec2(stamp, prevBal));
         line.push(new Vec2(stamp, bal));
@@ -32,7 +50,8 @@ const createBalLine = (transactions) => {
 
 export default class AccountBalancesGraph extends ViewLineGraph {
     constructor(accounts, dataRangeX, dataRangeY) {
-        const values = accounts.map(a => a.balLine = createBalLine(a.transactions));
+        const values = accounts.map(a =>
+            a.balLine = createBalLine(a.transactions, a.balancePoints));
         const title = 'Account Balances Over Time';
         const size = {x: 800, y: 640};
         const labels = accounts.map(a => `${a.bank.name} ${a.name}`);

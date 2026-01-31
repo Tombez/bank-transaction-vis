@@ -32,6 +32,7 @@ export default class TransactionViewer extends CsvViewer {
     }
     update() {
         this.csv.rows = this.getRows();
+        this.csv.update();
         if (this.filtersNode) {
             this.filtersNode.innerHTML = '';
             for (const {label} of this.filters)

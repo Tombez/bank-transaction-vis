@@ -38,7 +38,7 @@ export default class ActivityGraph extends Graph {
         }
 
         if (balancePoints) {
-            ctx.fillStyle = '#2c64cc';
+            ctx.fillStyle = '#0047cc';
             for (const {timestamp, balance} of balancePoints) {
                 const index = (timestamp - range.min) / MS_DAY | 0 + startY;
                 const x = index / 7 | 0;

@@ -3,6 +3,8 @@ import {LazyHtmlMixin, LazyHtml} from './LazyHtml.js';
 import memoMixin from './memoMixin.js';
 import ActivityGraph from './graphs/ActivityGraph.js';
 
+export const getUnique = () => `${Date.now() % 1e8}-${Math.random() * 1e8 | 0}`;
+
 const Settings = class extends LazyHtmlMixin(Map) {
     #settings = [];
     constructor() {
@@ -12,7 +14,7 @@ const Settings = class extends LazyHtmlMixin(Map) {
     }
     settingChanged(event) {}
     add(type, name, settingText, events, options, required) {
-        const unique = `${Date.now() % 1e8}-${Math.random() * 1e8 | 0}`;
+        const unique = getUnique();
         const id = `setting-${unique}`;
         const obj = {id, type, name, settingText, events, options, required};
         if (this.hasNode) this.generateSetting(obj);

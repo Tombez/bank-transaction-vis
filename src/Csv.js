@@ -52,7 +52,7 @@ export const CSV_DATA_TYPES = {
 };
 
 export const typeOf = str => {
-    if (!str) return CSV_DATA_TYPES.EMPTY;
+    if (str === '') return CSV_DATA_TYPES.EMPTY;
     if (isDateStr(str)) return CSV_DATA_TYPES.DATE;
     if (withoutLetters.test(str)) return CSV_DATA_TYPES.NUMBER;
     return CSV_DATA_TYPES.STRING;
@@ -75,9 +75,7 @@ export class Csv {
         return firstRow.length && firstRow.every(couldBeHeaderValue);
     }
     update() {
-        if (!this.rows.length) return;
-
-        if (!this.headings) {
+        if (!this.headings && this.rows.length) {
             const colCount = this.rows[0].length;
             this.headings = Array.from({length: colCount}, () => '');
         }
@@ -85,6 +83,8 @@ export class Csv {
             this.headings = this.headings.map(text => new CsvHeading(text));
         }
 
+        if (!this.rows.length) return;
+        
         const colTypes = this.rows[0].map(() => new Set());
         for (const row of this.rows) {
             for (let x = 0; x < row.length; ++x) {

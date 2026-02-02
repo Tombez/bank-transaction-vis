@@ -40,7 +40,7 @@ export default class ActivityGraph extends Graph {
         if (balancePoints) {
             ctx.fillStyle = '#0047cc';
             for (const {timestamp, balance} of balancePoints) {
-                const index = (timestamp - range.min) / MS_DAY | 0 + startY;
+                const index = ((timestamp - range.min) / MS_DAY | 0) + startY;
                 const x = index / 7 | 0;
                 const y = index % 7;
                 ctx.fillRect(x, y, 1, 1);

@@ -36,8 +36,10 @@ const createBalLine = (transactions, balancePoints) => {
                 for (const p of line) p.y -= diff;
             } else if (diff) {
                 const str = 'found balance difference of';
-                const account = transactions[startIndex].transactionFile.account.name;
-                console.debug(str, diff, account, new Date(stamp));
+                const file = transactions[startIndex].transactionFile;
+                const bank = file.account.bank.name;
+                const account = file.account.name;
+                console.debug(str, diff, `${bank} ${account}`, new Date(stamp));
             }
             bal = knownBal;
         }

@@ -1,6 +1,36 @@
 import {makeDraggable, makeDroppable} from './dragAndDrop.js';
 import {Named, getUnique} from './Named.js';
 import {TransactionFile} from './TransactionFile.js';
+import {fromDateString, dateToYmd} from './date-utils.js';
+
+const addBalInputs = (account, container, addBtn, date = '', bal = '') => {
+    const dateId = `setting-${getUnique()}`;
+    const balId = `setting-${getUnique()}`;
+    const deleteId = `delete-${getUnique()}`;
+    const htmlString = `
+        <div class="balance-point-container">
+            <div class="balance-point-row">
+                <label for="${dateId}">Date:</label>
+                <input type="date" id="${dateId}" />
+            </div>
+            <div class="balance-point-row">
+                <label for="${balId}">Balance:</label>
+                <input type="number" id="${balId}" />
+                <div id="${deleteId}" class="icon icon-delete"></div>
+            </div>
+        </div>`;
+    const range = document.createRange();
+    const frag = range.createContextualFragment(htmlString);
+    container.insertBefore(frag, addBtn);
+    container.querySelector(`#${dateId}`).value = date;
+    container.querySelector(`#${balId}`).value = bal;
+    const btnDelete = container.querySelector(`#${deleteId}`);
+    btnDelete.addEventListener('click', () => {
+        btnDelete.parentNode.parentNode.parentNode
+            .removeChild(btnDelete.parentNode.parentNode);
+        account.readBalancePoints();
+    });
+}
 
 export class Account extends Named {
     constructor(name) {
@@ -14,24 +44,27 @@ export class Account extends Named {
         this.headerFormats = [];
         this.isFullyFilled = false;
         this.changed();
+        let account = this;
         const oldGenerate = this.settings.onGenerate;
         this.settings.onGenerate = function() {
             if (oldGenerate) oldGenerate.apply(this);
             const container = document.createElement('div');
             container.className = 'balance-point-list';
             const addBtn = document.createElement('button');
-            addBtn.innerText = 'New';
-            addBtn.addEventListener('click', () => {
-                const frag = new DocumentFragment();
-                const dateId = `setting-${getUnique()}`;
-                const balId = `setting-${getUnique()}`;
-                frag.innerHTML = `<label for="${dateId}">Date:</label>
-                    <input type="text" id="${dateId}" />
-                    <label for="${balId}">Balance:</label>
-                    <input type="text" id="${balId}" />`;
-                container.insertBefore(frag, addBtn);
-            });
+            addBtn.innerText = 'New Known Balance';
+            addBtn.className = 'btn-new-balance';
+            addBtn.addEventListener('click',
+                () => addBalInputs(account, container, addBtn));
+            container.addEventListener('change',
+                () => account.readBalancePoints());
             container.appendChild(addBtn);
+
+            if (account.manualBalPoints)
+                for (const {timestamp, balance} of account.manualBalPoints) {
+                    const date = dateToYmd(new Date(timestamp), '-');
+                    addBalInputs(account, container, addBtn, date, balance);
+                }
+
             this.node.appendChild(container);
         };
     }
@@ -92,20 +125,50 @@ export class Account extends Named {
     }
     compile() {
         super.compile();
-        this.balancePoints = [];
+        this.autoBalPoints = [];
         for (const tranFile of this.transactionFiles) {
-            if (tranFile.balancePoints) this.balancePoints = this.balancePoints
+            if (tranFile.balancePoints) this.autoBalPoints = this.autoBalPoints
                 .concat(tranFile.balancePoints);
         }
+        this.balancePoints = this.autoBalPoints
+            .concat(this.manualBalPoints || []);
+    }
+    readBalancePoints() {
+        const inputs = Array.from(this.settings.node
+            .querySelectorAll('.balance-point-row>input'));
+        const balPoints = [];
+        for (let i = 0; i + 1 < inputs.length; i += 2) {
+            const dateInp = inputs[i];
+            const balInp = inputs[i + 1];
+            if (!dateInp.value || balInp.value == '') continue;
+            const timestamp = +fromDateString(dateInp.value);
+            const balance = +balInp.value;
+            balPoints.push({timestamp, balance});
+        }
+        this.manualBalPoints = balPoints;
+        this.settings.set('manualBalPoints', balPoints.map(
+            ({timestamp, balance}) =>
+                [dateToYmd(new Date(timestamp)), balance]));
+        this.balancePoints = this.manualBalPoints
+            .concat(this.autoBalPoints || []);
+        console.debug('read bal points', this.balancePoints);
     }
     encode() {
         return {
             settings: this.settings.encode(),
-            transactionFiles: this.transactionFiles.map(t => t.encode())};
+            transactionFiles: this.transactionFiles.map(t => t.encode())
+        };
     }
     static decode(accountObj) {
         let account = new Account(accountObj.settings['account']);
         account.settings.fromEncoded(accountObj.settings);
+        if (account.settings.get('manualBalPoints')) {
+            account.manualBalPoints = account.settings.get('manualBalPoints')
+                .map(([dateStr, balance]) => 
+                    ({timestamp: +fromDateString(dateStr), balance}));
+            account.balancePoints = account.manualBalPoints
+                .concat(account.autoBalPoints || []);
+        }
         accountObj.transactionFiles.forEach(t =>
             account.addTransactionFile(TransactionFile.decode(t)));
         return account;

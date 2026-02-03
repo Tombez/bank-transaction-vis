@@ -252,6 +252,25 @@ td, th {
     width: 1em;
     height: 1em;
 }
+.balance-point-container, .btn-new-balance {
+    margin-bottom: 8px;
+}
+.balance-point-row {
+    display: inline;
+}
+.balance-point-row > input {
+    display: inline;
+}
+.balance-point-row > .icon-delete {
+    margin-left: 5px;
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    transform: translateY(30%);
+}
+.btn-new-balance {
+    display: block;
+}
 .hiddenAnimated {
     height: 0px;
 }
@@ -390,7 +409,7 @@ label[for="transaction-input"] {
     background-color: #3e4046;
 }
 .graph-container:has(>.activity-graph) {
-    padding-bottom: .8vh;
+    padding-bottom: 13px;
 }
 .activity-graph {
     position: absolute;
@@ -426,6 +445,12 @@ label[for="transaction-input"] {
         margin-left: 0;
     }
     input[type="text"], select {
+        display: block;
+    }
+    .balance-point-row > input {
+        display: inline;
+    }
+    .balance-point-row {
         display: block;
     }
 }

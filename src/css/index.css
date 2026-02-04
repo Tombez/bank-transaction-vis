@@ -252,6 +252,10 @@ td, th {
     width: 1em;
     height: 1em;
 }
+.balance-point-list {
+    display: flex;
+    flex-direction: column;
+}
 .balance-point-container, .btn-new-balance {
     margin-bottom: 8px;
 }
@@ -270,6 +274,7 @@ td, th {
 }
 .btn-new-balance {
     display: block;
+    width: fit-content;
 }
 .hiddenAnimated {
     height: 0px;

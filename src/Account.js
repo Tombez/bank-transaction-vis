@@ -3,7 +3,7 @@ import {Named, getUnique} from './Named.js';
 import {TransactionFile} from './TransactionFile.js';
 import {fromDateString, dateToYmd} from './date-utils.js';
 
-const addBalInputs = (account, container, addBtn, date = '', bal = '') => {
+const addBalInputs = (account, container, date = '', bal = '') => {
     const dateId = `setting-${getUnique()}`;
     const balId = `setting-${getUnique()}`;
     const deleteId = `delete-${getUnique()}`;
@@ -21,7 +21,7 @@ const addBalInputs = (account, container, addBtn, date = '', bal = '') => {
         </div>`;
     const range = document.createRange();
     const frag = range.createContextualFragment(htmlString);
-    container.insertBefore(frag, addBtn);
+    container.appendChild(frag);
     container.querySelector(`#${dateId}`).value = date;
     container.querySelector(`#${balId}`).value = bal;
     const btnDelete = container.querySelector(`#${deleteId}`);
@@ -54,18 +54,20 @@ export class Account extends Named {
             addBtn.innerText = 'New Known Balance';
             addBtn.className = 'btn-new-balance';
             addBtn.addEventListener('click',
-                () => addBalInputs(account, container, addBtn));
+                () => addBalInputs(account, container));
             container.addEventListener('change',
                 () => account.readBalancePoints());
-            container.appendChild(addBtn);
 
-            if (account.manualBalPoints)
+            if (account.manualBalPoints) {
+                account.manualBalPoints.sort((a, b) => a.timestamp - b.timestamp);
                 for (const {timestamp, balance} of account.manualBalPoints) {
                     const date = dateToYmd(new Date(timestamp), '-');
-                    addBalInputs(account, container, addBtn, date, balance);
+                    addBalInputs(account, container, date, balance);
                 }
+            }
 
             this.node.appendChild(container);
+            this.node.appendChild(addBtn);
         };
     }
     generateHtml() {
@@ -134,6 +136,15 @@ export class Account extends Named {
             .concat(this.manualBalPoints || []);
     }
     readBalancePoints() {
+        const containers = Array.from(this.settings.node
+            .querySelectorAll('.balance-point-container'));
+        const today = dateToYmd(new Date());
+        const getStamp = row => +fromDateString(row
+            .querySelector('input[type="date"]').value || today);
+        containers.sort((a, b) => getStamp(a) - getStamp(b));
+        for (let i = 0; i < containers.length; ++i)
+            containers[i].style.order = i;
+
         const inputs = Array.from(this.settings.node
             .querySelectorAll('.balance-point-row>input'));
         const balPoints = [];
@@ -145,6 +156,7 @@ export class Account extends Named {
             const balance = +balInp.value;
             balPoints.push({timestamp, balance});
         }
+        balPoints.sort((a, b) => a.timestamp - b.timestamp);
         this.manualBalPoints = balPoints;
         this.settings.set('manualBalPoints', balPoints.map(
             ({timestamp, balance}) =>

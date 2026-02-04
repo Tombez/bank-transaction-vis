@@ -96,7 +96,7 @@ export class Account extends Named {
         if (this.content.hasNode) this.content.node.appendChild(tranFile.node);
         tranFile.account = this;
         if (tranFile.csv.hasHeader) {
-            const header = tranFile.csv.headings.join();
+            const header = tranFile.csv.headings.map(h => h.text).join();
             if (!this.headerFormats.includes(header))
                 this.headerFormats.push(header);
         }

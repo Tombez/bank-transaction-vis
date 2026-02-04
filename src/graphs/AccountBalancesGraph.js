@@ -3,6 +3,8 @@ import ContextMenu from '../ContextMenu.js';
 import {dateToYmd} from '../date-utils.js';
 import Vec2 from '../Vec2.js';
 
+const toCents = x => Math.round(x * 100) / 100;
+
 class Filter {
     constructor(label, test) {
         this.label = label;
@@ -22,23 +24,24 @@ const createBalLine = (transactions, balancePoints) => {
     for (let i = 0; i < transactions.length;) {
         let startIndex = i;
         const stamp = transactions[startIndex].timestamp;
-        const prevBal = bal;
+        let prevBal = bal;
         for (; i < transactions.length &&
             transactions[i].timestamp == stamp; ++i)
                 bal += transactions[i].amount;
 
         const knownBal = balMap.get(stamp);
         if (knownBal !== undefined) {
-            const diff = Math.round((bal - knownBal) * 100) / 100;
+            const file = transactions[startIndex].transactionFile;
+            const bank = file.account.bank.name;
+            const account = file.account.name;
+            const diff = toCents(bal - knownBal);
             if (prevKnownBalStamp === null) {
-                console.debug('intial balance offset of', diff);
+                console.debug(bank, account, 'intial balance offset of', diff);
                 prevKnownBalStamp = stamp;
                 for (const p of line) p.y -= diff;
+                prevBal -= diff;
             } else if (diff) {
                 const str = 'found balance difference of';
-                const file = transactions[startIndex].transactionFile;
-                const bank = file.account.bank.name;
-                const account = file.account.name;
                 console.debug(str, diff, `${bank} ${account}`, new Date(stamp));
             }
             bal = knownBal;

@@ -6,6 +6,7 @@ import {makeDraggable} from './dragAndDrop.js';
 import {Range} from './utils.js';
 
 const sanitize$Text = text => text.replaceAll(/[^-\d\.]/g, "");
+const toCents = x => Math.round(x * 100) / 100;
 
 class Transaction {
     constructor(date, desc, amount, row, transactionFile) {
@@ -17,7 +18,7 @@ class Transaction {
 
         this.timestamp = +this.date;
         this.year = this.date.getFullYear();
-        this.month = this.date.getMonth + 1;
+        this.month = this.date.getMonth() + 1;
         this.quarter = (this.month - 1) / 3 | 0;
         this.day = this.date.getDate();
     }
@@ -28,7 +29,7 @@ const getEndOfDayBalance = (transactions) => {
   
     const changes = new Map();
     for (const transaction of transactions) {
-        const away = transaction.balance - transaction.amount;
+        const away = toCents(transaction.balance - transaction.amount);
         const to = transaction.balance;
         const awayCount = (changes.get(away) || 0) - 1;
         if (awayCount) changes.set(away, awayCount);

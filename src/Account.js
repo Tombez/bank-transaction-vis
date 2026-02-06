@@ -30,6 +30,8 @@ const addBalInputs = (account, container, date = '', bal = '') => {
             .removeChild(btnDelete.parentNode.parentNode);
         account.readBalancePoints();
     });
+
+    account.orderBalancePointContainers();
 }
 
 export class Account extends Named {
@@ -135,7 +137,7 @@ export class Account extends Named {
         this.balancePoints = this.autoBalPoints
             .concat(this.manualBalPoints || []);
     }
-    readBalancePoints() {
+    orderBalancePointContainers() {
         const containers = Array.from(this.settings.node
             .querySelectorAll('.balance-point-container'));
         const today = dateToYmd(new Date());
@@ -144,6 +146,9 @@ export class Account extends Named {
         containers.sort((a, b) => getStamp(a) - getStamp(b));
         for (let i = 0; i < containers.length; ++i)
             containers[i].style.order = i;
+    }
+    readBalancePoints() {
+        this.orderBalancePointContainers();
 
         const inputs = Array.from(this.settings.node
             .querySelectorAll('.balance-point-row>input'));

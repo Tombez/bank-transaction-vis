@@ -31,18 +31,11 @@ const createBalLine = (transactions, balancePoints) => {
 
         const knownBal = balMap.get(stamp);
         if (knownBal !== undefined) {
-            const file = transactions[startIndex].transactionFile;
-            const bank = file.account.bank.name;
-            const account = file.account.name;
             const diff = toCents(bal - knownBal);
             if (prevKnownBalStamp === null) {
-                console.debug(bank, account, 'intial balance offset of', diff);
                 prevKnownBalStamp = stamp;
                 for (const p of line) p.y -= diff;
                 prevBal -= diff;
-            } else if (diff) {
-                const str = 'found balance difference of';
-                console.debug(str, diff, `${bank} ${account}`, new Date(stamp));
             }
             bal = knownBal;
         }

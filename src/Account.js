@@ -2,6 +2,9 @@ import {makeDraggable, makeDroppable} from './dragAndDrop.js';
 import {Named, getUnique} from './Named.js';
 import {TransactionFile} from './TransactionFile.js';
 import {fromDateString, dateToYmd} from './date-utils.js';
+import {Range} from './utils.js';
+
+const toCents = x => Math.round(x * 100) / 100;
 
 const addBalInputs = (account, container, date = '', bal = '') => {
     const dateId = `setting-${getUnique()}`;
@@ -92,6 +95,19 @@ export class Account extends Named {
     }
     generateContentHtml() {
         super.generateContentHtml();
+
+        const statsDiv = document.createElement('div');
+        statsDiv.className = 'stats';
+        this.content.node.appendChild(statsDiv);
+        for (const discrepancy of this.balanceDiscrepancies) {
+            const row = document.createElement('div');
+            const startDate = dateToYmd(new Date(discrepancy.period.min));
+            const endDate = dateToYmd(new Date(discrepancy.period.max));
+            row.innerText = `${startDate}-${endDate} $${discrepancy.prevBal} -> $${discrepancy.balance}, discrepancy: ${discrepancy.diff}`;
+            statsDiv.appendChild(row);
+        }
+        console.debug('generate content html', this.balanceDiscrepancies.length);
+
         for (const tranFile of this.transactionFiles)
             this.content.node.appendChild(tranFile.node);
     }
@@ -136,6 +152,8 @@ export class Account extends Named {
         }
         this.balancePoints = this.autoBalPoints
             .concat(this.manualBalPoints || []);
+        this.balancePoints.sort((a, b) => a.timestamp - b.timestamp);
+        this.checkBalancePointContinuity();
     }
     orderBalancePointContainers() {
         const containers = Array.from(this.settings.node
@@ -146,6 +164,46 @@ export class Account extends Named {
         containers.sort((a, b) => getStamp(a) - getStamp(b));
         for (let i = 0; i < containers.length; ++i)
             containers[i].style.order = i;
+    }
+    checkBalancePointContinuity() {
+        console.debug('checkBalancePointContinuity', this.bank.name, this.name, this.balancePoints.length);
+        if (!this.balancePoints.length) return;
+        let bal = 0;
+        const transactions = this.transactions.slice()
+            .sort((a, b) => a.timestamp - b.timestamp);
+        let transIndex = 0;
+        const sumUntil = timestamp => {
+            while (transIndex < transactions.length &&
+                transactions[transIndex].timestamp <= timestamp)
+                    bal += transactions[transIndex++].amount;
+        };
+        this.balanceDiscrepancies = [];
+        let startingBal;
+        for (let i = 0; i < this.balancePoints.length; i++) {
+            const balPoint = this.balancePoints[i];
+            sumUntil(balPoint.timestamp);
+            const diff = toCents(bal - balPoint.balance);
+            const bank = this.bank.name;
+            const account = this.name;
+            if (i == 0) {
+                startingBal = -diff;
+                console.debug(bank, account, 'intial balance offset of', startingBal);
+                if (startingBal == 2675.58) debugger;
+            } else if (diff != 0) {
+                const str = 'found balance difference of';
+                const dateStr = dateToYmd(new Date(balPoint.timestamp));
+                console.debug(str, diff, `${bank} ${account}`, dateStr);
+                const prevPoint = this.balancePoints[i - 1];
+                this.balanceDiscrepancies.push({
+                    period: new Range(prevPoint.timestamp, balPoint.timestamp),
+                    diff,
+                    prevBal: prevPoint.balance,
+                    balance: balPoint.balance
+                });
+            }
+            bal = balPoint.balance;
+        }
+        this.startingBal = startingBal;
     }
     readBalancePoints() {
         this.orderBalancePointContainers();
@@ -168,7 +226,9 @@ export class Account extends Named {
                 [dateToYmd(new Date(timestamp)), balance]));
         this.balancePoints = this.manualBalPoints
             .concat(this.autoBalPoints || []);
-        console.debug('read bal points', this.balancePoints);
+        this.balancePoints.sort((a, b) => a.timestamp - b.timestamp);
+        
+        this.checkBalancePointContinuity();
     }
     encode() {
         return {
@@ -185,6 +245,7 @@ export class Account extends Named {
                     ({timestamp: +fromDateString(dateStr), balance}));
             account.balancePoints = account.manualBalPoints
                 .concat(account.autoBalPoints || []);
+            account.balancePoints.sort((a, b) => a.timestamp - b.timestamp);
         }
         accountObj.transactionFiles.forEach(t =>
             account.addTransactionFile(TransactionFile.decode(t)));
@@ -195,8 +256,8 @@ export class Account extends Named {
     }
     static searchTranFileForAccountCol(tranFile) {
         if (!tranFile.csv.hasHeader) return -1;
-        return tranFile.csv.headings.findIndex(colName =>
-        /^(account|goal)( name| number)?$/i.test(colName));
+        return tranFile.csv.headings.findIndex(({text}) =>
+        /^(account|goal)( name| number)?$/i.test(text));
     }
     static searchTranFileForAccountNames(tranFile) {
         const csv = tranFile.csv;

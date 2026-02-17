@@ -48,6 +48,8 @@ export class Account extends Named {
         this.transactionFiles = this.children;
         this.headerFormats = [];
         this.isFullyFilled = false;
+        this.balanceDiscrepancies = [];
+        this.statsDiv = null;
         this.changed();
         let account = this;
         const oldGenerate = this.settings.onGenerate;
@@ -99,14 +101,8 @@ export class Account extends Named {
         const statsDiv = document.createElement('div');
         statsDiv.className = 'stats';
         this.content.node.appendChild(statsDiv);
-        for (const discrepancy of this.balanceDiscrepancies) {
-            const row = document.createElement('div');
-            const startDate = dateToYmd(new Date(discrepancy.period.min));
-            const endDate = dateToYmd(new Date(discrepancy.period.max));
-            row.innerText = `${startDate}-${endDate} $${discrepancy.prevBal} -> $${discrepancy.balance}, discrepancy: ${discrepancy.diff}`;
-            statsDiv.appendChild(row);
-        }
-        console.debug('generate content html', this.balanceDiscrepancies.length);
+        this.statsDiv = statsDiv;
+        this.displayDiscrepancies();
 
         for (const tranFile of this.transactionFiles)
             this.content.node.appendChild(tranFile.node);
@@ -166,7 +162,6 @@ export class Account extends Named {
             containers[i].style.order = i;
     }
     checkBalancePointContinuity() {
-        console.debug('checkBalancePointContinuity', this.bank.name, this.name, this.balancePoints.length);
         if (!this.balancePoints.length) return;
         let bal = 0;
         const transactions = this.transactions.slice()
@@ -204,6 +199,20 @@ export class Account extends Named {
             bal = balPoint.balance;
         }
         this.startingBal = startingBal;
+
+        this.displayDiscrepancies();
+    }
+    displayDiscrepancies() {
+        if (!this.statsDiv) return;
+        while(this.statsDiv.childNodes.length)
+            this.statsDiv.removeChild(this.statsDiv.childNodes[0]);
+        for (const discrepancy of this.balanceDiscrepancies) {
+            const row = document.createElement('div');
+            const startDate = dateToYmd(new Date(discrepancy.period.min));
+            const endDate = dateToYmd(new Date(discrepancy.period.max));
+            row.innerText = `${startDate}-${endDate} $${discrepancy.prevBal} -> $${discrepancy.balance}, discrepancy: ${discrepancy.diff}`;
+            this.statsDiv.appendChild(row);
+        }
     }
     readBalancePoints() {
         this.orderBalancePointContainers();

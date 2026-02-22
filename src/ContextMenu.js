@@ -24,8 +24,8 @@ export default class ContextMenu extends LazyHtml {
         target.addEventListener('contextmenu', this.listener);
     }
     listener(event) {
-        this.node.style.left = `${event.pageX}px`;
-        this.node.style.top = `${event.pageY}px`;
+        this.node.style.left = `${event.clientX}px`;
+        this.node.style.top = `${event.clientY}px`;
         this.node.style.display = 'block';
         document.body.appendChild(this.node);
         document.addEventListener('pointerdown', (event) => {

@@ -1,6 +1,7 @@
 import {Graph} from './Graph.js';
 import {Color} from "../color-utils.js";
 import {binarySearchI} from '../utils.js';
+import {dateToYmd} from '../date-utils.js';
 
 export class LineGraph extends Graph {
     constructor(...args) {
@@ -120,8 +121,8 @@ export class LineGraph extends Graph {
             }
             
             // Draw vertical lines:
-            ctx.textAlign = "center";
-            ctx.textBaseline = "top";
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
             const minYear = new Date(dataRangeX.min).getFullYear();
             const maxYear = new Date(dataRangeX.max).getFullYear();
             const yearCount = maxYear - minYear;
@@ -180,19 +181,32 @@ export class LineGraph extends Graph {
             ctx.globalAlpha = 1;
     
             // Y baseline:
-            ctx.beginPath();
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = "white";
-            const y0 = (0 - dataRangeY.min) / dataRangeY.diff;
-            ctx.moveTo(0, y0 * ctx.height);
-            ctx.lineTo(1 * ctx.width, y0 * ctx.height);
-            ctx.stroke();
+            if (dataRangeY.min <= 0) {
+                ctx.beginPath();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = 'white';
+                const y0 = (0 - dataRangeY.min) / dataRangeY.diff;
+                ctx.moveTo(0, y0 * ctx.height);
+                ctx.lineTo(1 * ctx.width, y0 * ctx.height);
+                ctx.stroke();
+            }
 
             // Vertical Intersector
             if (this.shouldDrawVertical) {
                 const width = this.canvas.width - this.axisSpace.x;
                 const percentX = (this.pointer.x - this.axisSpace.x) / width;
                 const barX = dataRangeX.min + percentX * dataRangeX.diff;
+                const barPixelX = toPixel(barX);
+
+                ctx.fillStyle = '#ddd';
+                const label = dateToYmd(new Date(barX));
+                const textWidth = ctx.measureText(label).width;
+                const textHeight = ctx.fontSize;
+                const rectX = barPixelX - textWidth / 2;
+                ctx.fillRect(rectX, -textHeight * 1.13, textWidth, textHeight);
+                ctx.fillStyle = '#333';
+                drawLabel(label, barX);
+                
                 this.drawVertical(ctx, dataRangeX, dataRangeY, barX);
             } else this.verticalIntersections = null;
         });
@@ -285,8 +299,8 @@ export class LineGraph extends Graph {
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
         const {x} = this.toPixelSpace({x: barX, y: 0}, dataRangeX, dataRangeY);
-        ctx.moveTo(x, dataRangeY.min);
-        ctx.lineTo(x, dataRangeY.max);
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, ctx.height);
         ctx.stroke();
         
         let intersections = this.getIntersections(barX);

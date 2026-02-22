@@ -175,18 +175,21 @@ const Collapsable = memoMixin(Base => class extends Base {
     }
     generateHtml() {
         super.generateHtml();
-        const collapseBtn = document.createElement('div');
+        const collapseBtn = document.createElement('button');
         collapseBtn.className = 'icon icon-expand';
+        collapseBtn.ariaLabel = collapseBtn.title = 'Expand';
         this.btnWrapper.appendChild(collapseBtn);
         collapseBtn.addEventListener('click', event => {
             if (!this.content.hasNode || this.content.node.hidden) {
                 this.content.node.hidden = false;
                 collapseBtn.classList.remove('icon-expand');
                 collapseBtn.classList.add('icon-collapse');
+                collapseBtn.ariaLabel = collapseBtn.title = 'Collapse';
             } else {
                 this.content.node.hidden = true;
                 collapseBtn.classList.remove('icon-collapse');
                 collapseBtn.classList.add('icon-expand');
+                collapseBtn.ariaLabel = collapseBtn.title = 'Expand';
             }
         });
     }
@@ -198,8 +201,9 @@ const Deletable = memoMixin(Base => class extends Base {
     }
     generateHtml() {
         super.generateHtml();
-        const deleteBtn = document.createElement('div');
+        const deleteBtn = document.createElement('button');
         deleteBtn.className = 'icon icon-delete';
+        deleteBtn.ariaLabel = deleteBtn.title = 'Delete';
         this.btnWrapper.appendChild(deleteBtn);
         deleteBtn.addEventListener('click', event => {
             this.delete();
@@ -208,9 +212,7 @@ const Deletable = memoMixin(Base => class extends Base {
     delete() {
         const event = new CustomEvent('delete', {detail: this, bubbles: true});
         this.node.dispatchEvent(event);
-        if (this.node.parentNode) {
-            this.node.parentNode.removeChild(this.node);
-        }
+        this.node.parentNode?.removeChild(this.node);
     }
 });
 const Editable = memoMixin(Base => class extends Base {
@@ -219,8 +221,9 @@ const Editable = memoMixin(Base => class extends Base {
     }
     generateHtml() {
         super.generateHtml();
-        const editBtn = document.createElement('div');
+        const editBtn = document.createElement('button');
         editBtn.className = 'icon icon-edit';
+        editBtn.ariaLabel = editBtn.title = 'Edit';
         this.btnWrapper.appendChild(editBtn);
         editBtn.addEventListener('click', event => {
             const deleteBtn = this.node.querySelector('.icon-delete');
@@ -230,11 +233,13 @@ const Editable = memoMixin(Base => class extends Base {
                 this.settings.node.hidden = false;
                 editBtn.classList.remove('icon-edit');
                 editBtn.classList.add('icon-done');
+                editBtn.ariaLabel = editBtn.title = 'Done';
                 if (deleteBtn) deleteBtn.hidden = false;
             } else {
                 this.settings.node.hidden = true;
                 editBtn.classList.remove('icon-done');
                 editBtn.classList.add('icon-edit');
+                editBtn.ariaLabel = editBtn.title = 'Edit';
                 if (deleteBtn) deleteBtn.hidden = true;
             }
         });

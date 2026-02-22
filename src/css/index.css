@@ -173,8 +173,10 @@ td, th {
     user-select: none;
 }
 .icon {
-    width: 1.2em;
-    height: 1.2em;
+    appearance: none;
+    width: 1.4em;
+    height: 1.4em;
+    font-size: inherit;
     margin-left: 25px;
     fill: rgb(240, 246, 252);
     background-color: rgb(14, 14, 15);
@@ -187,6 +189,7 @@ td, th {
     background-origin: border-box;
     border: 1px solid transparent;
     padding: 1px;
+    outline-offset: 5px;
 }
 .icon:hover {
     box-shadow: 0 0 2px black;
@@ -222,7 +225,7 @@ td, th {
     transform: rotate(180deg);
 }
 .page-btn {
-    min-width: 1em;
+    min-width: 1.4em;
     width: fit-content;
     display: flex;
     align-items: center;
@@ -367,6 +370,21 @@ td, th {
 .tab-bar > div:has(input:not(:checked)) + div:has(input:not(:checked)) {
     border-left: 1px solid var(--main-bg-color);
 }
+.tab-bar > div {
+    background-color: var(--header-color);
+}
+.tab-bar > div:has(input:not(:checked)) > label:hover {
+    border-radius: 10px;
+    box-shadow: inset 0px 0px 0px 5px var(--header-color);
+    background-color: #2f3233;
+}
+/* .tab-bar > div:has(input:not(:checked)):hover > label {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none" fill="none"><rect width="80" height="80" x="10" y="10" rx="20" ry="20" vector-effect="non-scaling-stroke" fill="%234c5053"/></svg>');
+    background-size: 100% 100%;
+} */
+.tab-bar > div:has(input:focus-visible) > label {
+    box-shadow: inset 0px 0px 0px 2px white;
+}
 .tab-bar > div:has(input:checked) > label {
     background-color: var(--main-bg-color);
     border-top-left-radius: 0.8em;
@@ -375,12 +393,11 @@ td, th {
     border-bottom-right-radius: 0;
     color: white;
     cursor: default;
-    box-shadow: 0px 0px 4px 10px #00000033;
     outline: 1px solid #777;
     clip-path: inset(-15px -15px 0px -15px);
     z-index: 2;
 }
-.tab-content { }
+/* .tab-content { } */
 .tab-bar input[type="radio"] {
     appearance: none;
     clip: rect(0 0 0 0); 

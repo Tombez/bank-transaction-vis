@@ -20,7 +20,7 @@ const addBalInputs = (account, container, date = '', bal = '') => {
             <div class="balance-point-row">
                 <label for="${balId}">Balance:</label>
                 <input type="number" id="${balId}" />
-                <div id="${deleteId}" class="icon icon-delete"></div>
+                <button id="${deleteId}" class="icon icon-delete"></button>
             </div>
         </div>`;
     const range = document.createRange();

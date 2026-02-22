@@ -56,13 +56,13 @@ export class CsvViewer extends LazyHtml {
         const pageBar = document.createElement('div');
         pageBar.className = 'page-bar btn-wrapper';
         pageBar.innerHTML = `
-        <div class="icon icon-left" aria-label="previous" title="previous"></div>
-        <div class="icon page-btn page-first">1</div>
+        <button class="icon icon-left" aria-label="previous" title="previous"></button>
+        <button class="icon page-btn page-first">1</button>
         <div class="ellipsis page-first">..</div>
-        <div class="icon page-btn page-selected">1</div>
+        <button class="icon page-btn page-selected">1</button>
         <div class="ellipsis page-last">..</div>
-        <div class="icon page-btn page-last">${this.pageCount}</div>
-        <div class="icon icon-right" aria-label="next" title="next"></div>
+        <button class="icon page-btn page-last">${this.pageCount}</button>
+        <button class="icon icon-right" aria-label="next" title="next"></button>
         <div class="page-items"></div>
         `;
         this.node.appendChild(pageBar);

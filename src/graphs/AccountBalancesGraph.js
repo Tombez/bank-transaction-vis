@@ -2,15 +2,9 @@ import {ViewLineGraph} from './ViewLineGraph.js';
 import ContextMenu from '../ContextMenu.js';
 import {dateToYmd} from '../date-utils.js';
 import Vec2 from '../Vec2.js';
+import {Filter} from '../TransactionFile.js';
 
 const toCents = x => Math.round(x * 100) / 100;
-
-class Filter {
-    constructor(label, test) {
-        this.label = label;
-        this.test = test;
-    }
-}
 
 const createBalLine = (transactions, balancePoints) => {
     if (!transactions.length) return [];
@@ -77,7 +71,8 @@ export default class AccountBalancesGraph extends ViewLineGraph {
             detail.push(new Filter(label, t =>
                 activeAccounts.includes(t.transactionFile.account)));
         }
-        const event = new CustomEvent('view-transactions', {detail});
+        const options = {detail, bubbles: true};
+        const event = new CustomEvent('view-transactions', options);
         this.node.dispatchEvent(event);
     }
     contextmenu(event) {

@@ -3,6 +3,7 @@ import {Named, getUnique} from './Named.js';
 import {TransactionFile} from './TransactionFile.js';
 import {fromDateString, dateToYmd} from './date-utils.js';
 import {Range} from './utils.js';
+import {Filter} from './TransactionFile.js';
 
 const toCents = x => Math.round(x * 100) / 100;
 
@@ -182,8 +183,7 @@ export class Account extends Named {
             const account = this.name;
             if (i == 0) {
                 startingBal = -diff;
-                console.debug(bank, account, 'intial balance offset of', startingBal);
-                if (startingBal == 2675.58) debugger;
+                console.debug(bank, account, 'intial balance of', startingBal);
             } else if (diff != 0) {
                 const str = 'found balance difference of';
                 const dateStr = dateToYmd(new Date(balPoint.timestamp));
@@ -208,9 +208,30 @@ export class Account extends Named {
             this.statsDiv.removeChild(this.statsDiv.childNodes[0]);
         for (const discrepancy of this.balanceDiscrepancies) {
             const row = document.createElement('div');
-            const startDate = dateToYmd(new Date(discrepancy.period.min));
-            const endDate = dateToYmd(new Date(discrepancy.period.max));
-            row.innerText = `${startDate}-${endDate} $${discrepancy.prevBal} -> $${discrepancy.balance}, discrepancy: ${discrepancy.diff}`;
+            const startDate = new Date(discrepancy.period.min);
+            const startDateStr = dateToYmd(startDate);
+            const endDate = new Date(discrepancy.period.max);
+            const endDateStr = dateToYmd(endDate);
+            const link = document.createElement('a');
+            link.textContent = `${startDateStr}-${endDateStr}`;
+            link.href = 'javascript:void(0)';
+            link.addEventListener('click', () => {
+                const filters = [];
+                const range = new Range(startDate, endDate);
+                let label = `Period: ${startDateStr}-${endDateStr}`;
+                filters.push(new Filter(label, t =>
+                    range.contains(t.timestamp)));
+                label = `Account: ${this.name}`;
+                filters.push(new Filter(label, t =>
+                    this == t.transactionFile.account));
+                const options = {detail: filters, bubbles: true};
+                const event = new CustomEvent('view-transactions', options);
+                link.dispatchEvent(event);
+            });
+            row.appendChild(link);
+            const span = document.createElement('span');
+            span.textContent = ` $${discrepancy.prevBal} -> $${discrepancy.balance}, discrepancy: ${discrepancy.diff}`;
+            row.appendChild(span);
             this.statsDiv.appendChild(row);
         }
     }

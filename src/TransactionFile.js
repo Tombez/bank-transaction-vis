@@ -24,6 +24,13 @@ class Transaction {
     }
 }
 
+export class Filter {
+    constructor(label, test) {
+        this.label = label;
+        this.test = test;
+    }
+}
+
 const getEndOfDayBalance = (transactions) => {
     if (!transactions.length) return null;
   

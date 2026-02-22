@@ -25,6 +25,7 @@ let bankList = window.bankList = [];
 let banksRoot = {children: bankList};
 let transactionTab = null;
 let compileCounter = 0;
+let tViewer;
 
 const updateloop = () => {
     for (const graph of graphs) {
@@ -233,7 +234,7 @@ const compileTransactionsDebounced = () => {
 
     removeGraphs();
 
-    const tViewer = recreateTViewer(transactions);
+    tViewer = recreateTViewer(transactions);
     
     const accounts = bankList.map(bank => bank.accounts).flat();
     if (!accounts.length) return;
@@ -247,7 +248,7 @@ const compileTransactionsDebounced = () => {
     const stampRange = Range.fromRanges(accountsWithTs.map(a => a.stampRange));
     const balRange = Range.fromRanges(accountsWithTs.map(a => a.balRange));
     
-    makeBalancesGraph(accountsWithTs, tViewer, stampRange, balRange);
+    makeBalancesGraph(accountsWithTs, stampRange, balRange);
     makeNetWorthGraph(accountsWithTs, stampRange, balRange);
     updateActivityGraphs(bankList, stampRange);
 };
@@ -334,13 +335,8 @@ const calculateDailyBalances = (accounts) => {
         }
     }
 };
-const makeBalancesGraph = (accounts, tViewer, stampRange, balRange) => {
+const makeBalancesGraph = (accounts, stampRange, balRange) => {
     const graph = new AccountBalancesGraph(accounts, stampRange, balRange);
-    graph.node.addEventListener('view-transactions', ({detail: filters}) => {
-        tViewer.filters = filters;
-        tViewer.update();
-        transactionTab.childNodes[1]?.click();
-    });
     graphs.push(graph);
     document.querySelector('#chart').appendChild(graph.node);
 };
@@ -635,7 +631,7 @@ const makeExample = () => {
     });
 };
 const afterPageLoad = event => {
-     fetch("./src/json/default-rules.json").then(res => {
+    fetch("./src/json/default-rules.json").then(res => {
         if (!res.ok) return console.error(res);
         res.json().then(rules => {
             loadRules(rules);
@@ -660,6 +656,12 @@ const afterPageLoad = event => {
 
     let transactionInput = document.querySelector("#transaction-input");
     transactionInput.addEventListener("change", transactionInputChange);
+
+    document.addEventListener('view-transactions', ({detail: filters}) => {
+        tViewer.filters = filters;
+        tViewer.update();
+        transactionTab.childNodes[1]?.click();
+    });
 
     makeExample();
 }

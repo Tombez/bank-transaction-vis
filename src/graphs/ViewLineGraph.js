@@ -7,7 +7,7 @@ export class ViewLineGraph extends LineGraph {
         super(title, values, labels, size);
         this.viewSliderHeight = 40;
         this.ballRadius = this.viewSliderHeight / 6;
-        this.range = {min: this.axisSpace.x, max: size.x};
+        this.range = new Range();
         this.holding;
         this.dataRangeX = dataRangeX;
         this.dataRangeY = dataRangeY;
@@ -19,11 +19,14 @@ export class ViewLineGraph extends LineGraph {
         this.ctx.height -= this.viewSliderHeight;
     }
     getViewRange() {
+        let min = this.dataRangeX.min + this.range.min * this.dataRangeX.diff;
+        let max = this.dataRangeX.min + this.range.max * this.dataRangeX.diff;
+        return new Range(min, max);
+    }
+    getPixelRange() {
         const width = this.canvas.width - this.axisSpace.x;
-        const minPercent = (this.range.min - this.axisSpace.x) / width;
-        const maxPercent = (this.range.max - this.axisSpace.x) / width;
-        let min = this.dataRangeX.min + minPercent * this.dataRangeX.diff;
-        let max = this.dataRangeX.min + maxPercent * this.dataRangeX.diff;
+        const min = this.range.min * width + this.axisSpace.x;
+        const max = this.range.max * width + this.axisSpace.x;
         return new Range(min, max);
     }
     draw(ctx = this.ctx) {
@@ -43,7 +46,7 @@ export class ViewLineGraph extends LineGraph {
             }
             line.inRange = oneInRange;
         }
-        const rangeY = {min, max, diff: max - min};
+        const rangeY = new Range(min, max);
         super.draw(ctx, rangeX, rangeY);
         this.drawViewBar(ctx, rangeX, rangeY);
     }
@@ -51,47 +54,63 @@ export class ViewLineGraph extends LineGraph {
         ctx.beginPath();
         ctx.fillStyle = '#423946';
         ctx.globalAlpha = 0.7;
-        const leftWidth = this.range.min - this.axisSpace.x;
-        const rightWidth = this.canvas.width - this.range.max;
-        ctx.rect(this.axisSpace.x, ctx.height, leftWidth, this.viewSliderHeight);
-        ctx.rect(this.range.max, ctx.height, rightWidth, this.viewSliderHeight);
+        const pixelRange = this.getPixelRange();
+        const beforeWidth = pixelRange.min - this.axisSpace.x;
+        const afterWidth = this.canvas.width - pixelRange.max;
+        ctx.rect(this.axisSpace.x, ctx.height, beforeWidth, this.viewSliderHeight);
+        ctx.rect(pixelRange.max, ctx.height, afterWidth, this.viewSliderHeight);
         ctx.fill();
         ctx.globalAlpha = 1;
 
         ctx.beginPath();
         ctx.strokeStyle = '#423946';
-        ctx.moveTo(this.range.min, this.canvas.height);
-        ctx.lineTo(this.range.min, this.ctx.height);
+        ctx.moveTo(pixelRange.min, this.canvas.height);
+        ctx.lineTo(pixelRange.min, this.ctx.height);
 
-        ctx.moveTo(this.range.max, this.canvas.height);
-        ctx.lineTo(this.range.max, this.ctx.height);
+        ctx.moveTo(pixelRange.max, this.canvas.height);
+        ctx.lineTo(pixelRange.max, this.ctx.height);
         ctx.lineWidth = 2;
         ctx.stroke();
 
         const r = this.ballRadius;
         const midY = (this.ctx.height + this.canvas.height) / 2;
-        for (const x of [this.range.min, this.range.max]) {
-            ctx.beginPath();
-            ctx.moveTo(x + r, midY);
-            ctx.arc(x, midY, r, 0, 2 * Math.PI);
-            ctx.fill();
-        }
 
-        const leftLabel = dateToYmd(new Date(rangeX.min));
-        const rightLabel = dateToYmd(new Date(rangeX.max));
+        const beginLabel = dateToYmd(new Date(rangeX.min));
+        const endLabel = dateToYmd(new Date(rangeX.max));
         ctx.setFontSize(18, true);
-        ctx.fillStyle = '#5e5164ff';
+        const handleColor = '#5e5164';
+        ctx.fillStyle = handleColor;
         ctx.strokeStyle = '#000';
         ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        const labelWidth = ctx.measureText(rightLabel).width;
-        let x = this.range.max + r;
-        if (labelWidth > rightWidth - r) x = this.range.max - labelWidth - r;
-        ctx.fillText(rightLabel, x, midY);
-        x = this.range.min - labelWidth - r;
-        if (labelWidth > leftWidth - r + this.axisSpace.x)
-            x = this.range.min + r;
-        ctx.fillText(leftLabel, x, midY);
+        ctx.textBaseline = 'top';
+        const beginWidth = ctx.measureText(beginLabel).width;
+        const endWidth = ctx.measureText(endLabel).width;
+        let endX = pixelRange.max + r;
+        if (endWidth > afterWidth - r) endX = pixelRange.max - endWidth - r;
+        let beginX = pixelRange.min - beginWidth - r;
+        if (beginWidth > beforeWidth - r + this.axisSpace.x)
+            beginX = pixelRange.min + r;
+        const overlapping = pixelRange.min + r > endX ||
+            pixelRange.max - r < beginX + beginWidth;
+        let y = midY - ctx.fontSize * (overlapping ? 1 : 1 / 2);
+        ctx.strokeText(beginLabel, beginX, y);
+        ctx.fillText(beginLabel, beginX, y);
+        y = midY - ctx.fontSize * (overlapping ? 0 : 1 / 2);
+        ctx.strokeText(endLabel, endX, y);
+        ctx.fillText(endLabel, endX, y);
+
+        ctx.beginPath();
+        ctx.fillStyle = handleColor;
+        let x = pixelRange.min;
+        y = overlapping ? midY - ctx.fontSize / 2 : midY;
+        ctx.moveTo(x + r, y);
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
+
+        x = pixelRange.max;
+        y = overlapping ? midY + ctx.fontSize / 2 : midY;
+        ctx.moveTo(x + r, y);
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
+        ctx.fill();
     }
     setPointer(event) {
         this.prevPointer.x = this.pointer.x;
@@ -105,12 +124,13 @@ export class ViewLineGraph extends LineGraph {
             if (this.pointer.y >= this.ctx.height) {
                 const pointer = this.pointer;
                 const r = this.ballRadius;
-                if (pointer.x >= this.range.min - r && pointer.x <= this.range.min + r)
-                    this.holding = 'min';
-                else if (pointer.x >= this.range.max - r && pointer.x <= this.range.max + r)
-                    this.holding = 'max';
-                else if (pointer.x > this.range.min + r && pointer.x < this.range.max - r)
-                    this.holding = 'both';
+                const pixelRange = this.getPixelRange();
+                if (pointer.x >= pixelRange.min - r &&
+                    pointer.x <= pixelRange.min + r) this.holding = 'min';
+                else if (pointer.x >= pixelRange.max - r &&
+                    pointer.x <= pixelRange.max + r) this.holding = 'max';
+                else if (pointer.x > pixelRange.min + r &&
+                    pointer.x < pixelRange.max - r) this.holding = 'both';
 
                 if (this.holding) {
                     this.canvas.setPointerCapture(event.pointerId);
@@ -127,7 +147,7 @@ export class ViewLineGraph extends LineGraph {
     pointermove(event) {
         super.pointermove(event);
         if (this.holding) {
-            const range = this.range;
+            const range = this.getPixelRange();
             if (this.holding == 'both') {
                 const difference = this.pointer.x - this.prevPointer.x;
                 range.min = Math.min(Math.max(range.min + difference, this.axisSpace.x), range.max - 1);
@@ -138,6 +158,9 @@ export class ViewLineGraph extends LineGraph {
                 [range.min + 1, this.canvas.width];
                 range[this.holding] = Math.min(Math.max(this.pointer.x, min), max);
             }
+            const width = this.canvas.width - this.axisSpace.x;
+            this.range.min = (range.min - this.axisSpace.x) / width;
+            this.range.max = (range.max - this.axisSpace.x) / width;
             this.hasChanged = true;
         }
     }

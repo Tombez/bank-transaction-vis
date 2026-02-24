@@ -3,10 +3,12 @@ import {Color} from "../color-utils.js";
 import {binarySearchI} from '../utils.js';
 import {dateToYmd} from '../date-utils.js';
 
+const toCents = x => Math.round(x * 100) / 100;
+
 export class LineGraph extends Graph {
     constructor(...args) {
         super(...args);
-        this.axisSpace = {x: 50, y: 30};
+        this.axisSpace = {x: 75, y: 30};
         this.generateColors();
         this.shouldDrawVertical = false;
         this.labels = this.labels.map(l => ({name: l, active: true}));
@@ -56,6 +58,15 @@ export class LineGraph extends Graph {
     draw(ctx = this.ctx, dataRangeX, dataRangeY) {
         ctx.fillStyle = "black";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        if (!Number.isFinite(dataRangeY.min) || !dataRangeY.diff) {
+            ctx.fillStyle = '#fff';
+            ctx.fillText('No balance lines to show', 100, 100);
+            return;
+        }
+
+        const yLabelFontSize = 22;
+
         ctx.temp(() => {
             const axisSpace = this.axisSpace;
             ctx.translate(axisSpace.x, ctx.height - axisSpace.y);
@@ -96,15 +107,21 @@ export class LineGraph extends Graph {
             ctx.beginPath();
             ctx.fillStyle = '#000';
             const yAxisWidth = axisSpace.x / axisScaler.x;
-            ctx.fillRect(-yAxisWidth, 0, yAxisWidth, this.canvas.height);
-            ctx.strokeStyle = "white";
+            ctx.fillRect(-yAxisWidth, -900, yAxisWidth, this.canvas.height * 3);
+            ctx.strokeStyle = 'white';
             ctx.lineWidth = 2;
-            ctx.fillStyle = "white";
-            ctx.textAlign = "right";
-            ctx.textBaseline = "middle";
-            ctx.setFontSize(22);
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.setFontSize(yLabelFontSize);
             ctx.globalAlpha = 0.2;
-            const yStep = 2000;
+            const maxLabels = 10;
+            const steps = [2, 5/2, 2];
+            let yStep = 0.01;
+            for (let i = 0; dataRangeY.diff / yStep > maxLabels;) {
+                yStep = toCents(yStep * steps[i]);
+                i = (i + 1) % steps.length;
+            }
             ctx.beginPath();
             let y = Math.floor(dataRangeY.min / yStep) * yStep;
             for (; y < dataRangeY.max; y += yStep) {
@@ -116,7 +133,7 @@ export class LineGraph extends Graph {
                     ctx.globalAlpha = 1;
                     ctx.translate(-5, drawY);
                     ctx.scale(1, -1);
-                    ctx.fillText(`$${y/1000|0}k`, 0, 0);
+                    ctx.fillText(`$${toCents(y)}`, 0, 0);
                 });
             }
             
@@ -129,6 +146,8 @@ export class LineGraph extends Graph {
             const margin = 8;
             const toPixel = x =>
                 (x - dataRangeX.min) / dataRangeX.diff * ctx.width;
+            const fromPixel = x =>
+                x / ctx.width * dataRangeX.diff + dataRangeX.min;
             const drawLabel = (label, x) => {
                 if (x < dataRangeX.min) return;
                 const drawX = toPixel(x);
@@ -194,20 +213,25 @@ export class LineGraph extends Graph {
             // Vertical Intersector
             if (this.shouldDrawVertical) {
                 const width = this.canvas.width - this.axisSpace.x;
-                const percentX = (this.pointer.x - this.axisSpace.x) / width;
+                let pointerX = Math.min(this.pointer.x, this.canvas.width);
+                pointerX = Math.max(pointerX, this.axisSpace.x);
+                const percentX = (pointerX - this.axisSpace.x) / width;
                 const barX = dataRangeX.min + percentX * dataRangeX.diff;
                 const barPixelX = toPixel(barX);
-
+                
                 ctx.fillStyle = '#ddd';
                 const label = dateToYmd(new Date(barX));
                 const textWidth = ctx.measureText(label).width;
+                const midLabelPixel = Math.min(barPixelX, this.canvas.width - textWidth / 2);
+                const midLabel = fromPixel(midLabelPixel);
                 const textHeight = ctx.fontSize;
-                const rectX = barPixelX - textWidth / 2;
+                const rectX = midLabelPixel - textWidth / 2;
                 ctx.fillRect(rectX, -textHeight * 1.13, textWidth, textHeight);
                 ctx.fillStyle = '#333';
-                drawLabel(label, barX);
+                ctx.textAlign = 'center';
+                drawLabel(label, midLabel);
                 
-                this.drawVertical(ctx, dataRangeX, dataRangeY, barX);
+                this.drawVertical(ctx, dataRangeX, dataRangeY, percentX, barX);
             } else this.verticalIntersections = null;
         });
     
@@ -294,7 +318,7 @@ export class LineGraph extends Graph {
         super.pointermove(event);
         if (this.shouldDrawVertical) this.hasChanged = true;
     }
-    drawVertical(ctx, dataRangeX, dataRangeY, barX) {
+    drawVertical(ctx, dataRangeX, dataRangeY, percentX, barX) {
         ctx.beginPath();
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
@@ -317,12 +341,13 @@ export class LineGraph extends Graph {
             ctx.arc(x, y, r, 0, 2 * Math.PI);
             ctx.fill();
 
-            ctx.textAlign = "left";
-            ctx.textBaseline = "middle";
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
             ctx.temp(() => {
-                ctx.translate(x + r + margin, y);
-                const halfHeight = ctx.fontSize / 2;
                 const width = ctx.measureText(valueString).width;
+                const xStart = percentX <= 0.5 ? r + margin : -(width + r + margin);
+                ctx.translate(x + xStart, y);
+                const halfHeight = ctx.fontSize / 2;
                 ctx.fillStyle = '#000';
                 ctx.fillRect(0, -halfHeight, width, halfHeight * 2);
                 ctx.scale(1, -1);
@@ -342,7 +367,7 @@ export class LineGraph extends Graph {
             if (beforeItem.x > targetX || index == line.length - 1) continue;
             const afterItem = line[index + 1];
             const reverseInterpolate = (start, end, n) =>
-                (n - start) / (end - start);
+                end == start ? 1 : (n - start) / (end - start);
             const interpolate = (start, end, percent) =>
                 (end - start) * percent + start;
             const percent = reverseInterpolate(beforeItem.x, afterItem.x, targetX);

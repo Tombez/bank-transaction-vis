@@ -26,6 +26,7 @@ let banksRoot = {children: bankList};
 let transactionTab = null;
 let compileCounter = 0;
 let tViewer;
+let activityRange;
 
 const updateloop = () => {
     for (const graph of graphs) {
@@ -247,11 +248,12 @@ const compileTransactionsDebounced = () => {
     if (!accountsWithTs.length) return;
 
     const stampRange = Range.fromRanges(accountsWithTs.map(a => a.stampRange));
+    activityRange = stampRange;
     const balRange = Range.fromRanges(accountsWithTs.map(a => a.balRange));
     
     makeBalancesGraph(accountsWithTs, stampRange, balRange);
     makeNetWorthGraph(accountsWithTs, stampRange, balRange);
-    updateActivityGraphs(bankList, stampRange);
+    updateActivityGraphs();
 };
 const recreateTViewer = (transactions) => {
     const tranContainer = document.querySelector('#transactions');
@@ -384,7 +386,9 @@ const makeNetWorthGraph = (accounts, stampRange, balRange) => {
     graphs.push(netWorthGraph);
     document.querySelector('#chart').appendChild(netWorthGraph.node);
 };
-const updateActivityGraphs = (banks, range) => {
+const updateActivityGraphs = () => {
+    const banks = bankList;
+    const range = activityRange;
     const dayCount = Math.round(range.diff / Date.msDay) + 1;
     let days = new BitArray(dayCount);
     let accSum = new BitArray(dayCount);
@@ -662,6 +666,10 @@ const afterPageLoad = event => {
         tViewer.filters = filters;
         tViewer.update();
         transactionTab.childNodes[1]?.click();
+    });
+
+    document.addEventListener('re-draw activity', () => {
+        debounceFunc(updateActivityGraphs, COMPILE_COOLDOWN);
     });
 
     makeExample();

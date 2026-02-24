@@ -15,7 +15,7 @@ export class Graph extends LazyHtml {
             eventName = 'pointer' + eventName;
             this.canvas.addEventListener(eventName, this[eventName].bind(this));
         }
-        for (const eventName of ['contextmenu', 'touchstart'])
+        for (const eventName of ['contextmenu', 'touchstart', 'contextrestored'])
             this.canvas.addEventListener(eventName, this[eventName].bind(this));
     }
     generateHtml() {
@@ -69,5 +69,8 @@ export class Graph extends LazyHtml {
     contextmenu(event) {}
     touchstart(event) {
         event.preventDefault();
+    }
+    contextrestored(event) {
+        this.draw(this.ctx);
     }
 }

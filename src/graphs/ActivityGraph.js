@@ -47,6 +47,11 @@ export default class ActivityGraph extends Graph {
             }
         }
     }
+    contextrestored() {
+        super.contextrestored();
+        const event = new CustomEvent('re-draw activity', {bubbles: true});
+        this.node.dispatchEvent(event);
+    }
     static populateDays(days, transactions, range) {
         for (const transaction of transactions) {
             const diff = transaction.timestamp - range.min;

@@ -74,7 +74,7 @@ const Settings = class extends LazyHtmlMixin(Map) {
     }
 };
 
-const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Base) {
+const NamedMixin = memoMixin(Base => class extends LazyHtmlMixin(Base) {
     #nameSettingName;
     #icon;
     constructor(name, {settingName, icon, titleType, titleClass}) {
@@ -89,10 +89,6 @@ const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Bas
         this.content.className = 'content';
         this.content.onGenerate = () => this.generateContentHtml();
         
-        this.settings.add('text', settingName, `What is the name of the ${settingName}?`, ({change: event => {
-            this.name = event.target.value;
-        }}));
-        
         this.name = name;
         this.children = [];
         this.activityGraph = new ActivityGraph();
@@ -106,7 +102,17 @@ const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Bas
 
         this.title = document.createElement(this.titleType);
         this.title.className = this.titleClass;
-        this.assignTitle(this.settings.get(this.#nameSettingName));
+        const emojiSpan = document.createElement('span');
+        emojiSpan.className = 'emoji';
+        emojiSpan.title = capitalize(this.#nameSettingName);
+        emojiSpan.innerText = this.#icon;
+        this.title.appendChild(emojiSpan);
+        this.nameSpan = document.createElement('span');
+        this.nameSpan.textContent = this.name;
+        this.title.appendChild(this.nameSpan);
+        this.nameSpan.addEventListener('keypress', event => {
+            if (event.key == 'Enter') this.nameSpan.blur();
+        });
         this.header.appendChild(this.title);
 
         this.btnWrapper = document.createElement('div');
@@ -121,18 +127,12 @@ const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Bas
         this.settings.node.hidden = true;
         this.node.appendChild(this.content.node);
     }
-    assignTitle(name) {
-        const title = capitalize(this.#nameSettingName);
-        if (!this.span) this.span = document.createElement('span');
-        this.span.className = 'emoji';
-        this.span.title = title;
-        this.span.innerText = this.#icon;
-
-        this.title.innerText = name;
-        this.title.prepend(this.span);
-
-        const event = new CustomEvent('rename', {detail: this, bubbles: true});
-        this.node.dispatchEvent(event);
+    onEdit() {
+        this.nameSpan.setAttribute('contenteditable', 'plaintext-only');
+    }
+    doneEditing() {
+        this.nameSpan.setAttribute('contenteditable', false);
+        this.name = this.nameSpan.textContent;
     }
     checkFullyFilled() {
         this.isFullyFilled = this.children.every(c => c.isFullyFilled);
@@ -161,13 +161,16 @@ const NamedMixin = memoMixin(Base => Collapsable(class extends LazyHtmlMixin(Bas
         return this.settings.get(this.#nameSettingName);
     }
     set name(name) {
+        if (name == this.settings.get(this.#nameSettingName)) return;
         this.settings.set(this.#nameSettingName, name);
         if (this.hasNode) {
-            this.settings.inputs[this.#nameSettingName].value = name;
-            this.assignTitle(name);
+            this.nameSpan.textContent = name;
+            
+            const event = new CustomEvent('rename', {detail: this, bubbles: true});
+            this.node.dispatchEvent(event);
         }
     }
-}));
+});
 
 const Collapsable = memoMixin(Base => class extends Base {
     constructor(...args) {
@@ -235,12 +238,14 @@ const Editable = memoMixin(Base => class extends Base {
                 editBtn.classList.add('icon-done');
                 editBtn.ariaLabel = editBtn.title = 'Done';
                 if (deleteBtn) deleteBtn.hidden = false;
+                if (this.onEdit) this.onEdit();
             } else {
                 this.settings.node.hidden = true;
                 editBtn.classList.remove('icon-done');
                 editBtn.classList.add('icon-edit');
                 editBtn.ariaLabel = editBtn.title = 'Edit';
                 if (deleteBtn) deleteBtn.hidden = true;
+                if (this.doneEditing) this.doneEditing();
             }
         });
         const deleteBtn = this.node.querySelector('.icon-delete');
@@ -248,4 +253,4 @@ const Editable = memoMixin(Base => class extends Base {
     }
 });
 
-export const Named = Editable(Deletable(NamedMixin()));
+export const Named = Editable(Collapsable(Deletable(NamedMixin())));

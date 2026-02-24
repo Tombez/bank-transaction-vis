@@ -248,6 +248,16 @@ td, th {
     margin: 0;
     max-width: 80%;
 }
+span[contenteditable="plaintext-only"] {
+    cursor: text;
+    padding: 3px;
+    outline: 1px solid gray;
+    border-radius: 5px;
+    background: #3b3b3b;
+}
+span[contenteditable="plaintext-only"]:focus {
+    outline: 2px solid white;
+}
 .setting {
     margin: 2px 6px 8px 0px;
 }

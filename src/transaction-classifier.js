@@ -187,6 +187,7 @@ const addBank = (bank) => {
         compileTransactions();
     });
     bank.node.addEventListener('change', compileTransactions);
+    bank.node.addEventListener('rename', compileTransactions);
 };
 const createNewBank = () => {
     let newName = 'Default Bank';

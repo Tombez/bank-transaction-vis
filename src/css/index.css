@@ -271,9 +271,9 @@ td, th {
 .balance-point-row > .icon-delete {
     margin-left: 5px;
     display: inline-block;
-    width: 1em;
-    height: 1em;
-    transform: translateY(30%);
+    width: 1.2em;
+    height: 1.2em;
+    transform: translateY(20%);
 }
 .btn-new-balance {
     display: block;

@@ -240,8 +240,9 @@ export class LineGraph extends Graph {
         ctx.globalAlpha = 0.8;
         const x = ctx.width / 2;
         ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
         ctx.setFontSize(26, true);
-        ctx.fillText(this.title, x, 20);
+        ctx.fillText(this.title, x, 0);
         ctx.globalAlpha = 1;
     
         // Draw Graph Key:

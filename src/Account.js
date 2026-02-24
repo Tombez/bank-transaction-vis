@@ -77,6 +77,9 @@ export class Account extends Named {
             this.node.appendChild(container);
             this.node.appendChild(addBtn);
         };
+
+        this.settings.add('checkbox', 'invertAmounts',
+            `Invert the transaction amounts?`);
     }
     generateHtml() {
         super.generateHtml();
@@ -142,6 +145,8 @@ export class Account extends Named {
     }
     compile() {
         super.compile();
+        if (this.settings.get('invertAmounts'))
+            for (const tran of this.transactions) tran.amount *= -1;
         this.autoBalPoints = [];
         for (const tranFile of this.transactionFiles) {
             if (tranFile.balancePoints) this.autoBalPoints = this.autoBalPoints

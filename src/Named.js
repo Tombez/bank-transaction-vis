@@ -13,7 +13,7 @@ const Settings = class extends LazyHtmlMixin(Map) {
         this.fragments = [];
     }
     settingChanged(event) {}
-    add(type, name, settingText, events, options, required) {
+    add(type, name, settingText, events = {}, options, required) {
         const unique = getUnique();
         const id = `setting-${unique}`;
         const obj = {id, type, name, settingText, events, options, required};

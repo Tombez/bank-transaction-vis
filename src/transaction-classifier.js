@@ -22,7 +22,7 @@ let addBankBtn;
 let exportBtn;
 let classifiers = [];
 let bankList = window.bankList = [];
-let banksRoot = {children: bankList};
+let banksRoot = {children: bankList, hasNode: true, content: {hasNode: true}};
 let transactionTab = null;
 let compileCounter = 0;
 let tViewer;
@@ -227,12 +227,13 @@ const compileTransactions = () => {
 };
 const compileTransactionsDebounced = () => {
     console.debug('compile', compileCounter++);
-    Bank.prototype.compile.apply(banksRoot);
+    banksRoot.__proto__ = Bank.prototype;
+    banksRoot.compile();
     let transactions = banksRoot.transactions;
     transactions.sort((a, b) => a.timestamp - b.timestamp);
 
-    const bankListDiv = document.querySelector('#bank-list');
-    for (const bank of bankList) bankListDiv.appendChild(bank.node);
+    // const bankListDiv = document.querySelector('#bank-list');
+    // for (const bank of bankList) bankListDiv.appendChild(bank.node);
 
     removeGraphs();
 

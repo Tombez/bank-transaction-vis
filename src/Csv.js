@@ -79,7 +79,7 @@ export class Csv {
             const colCount = this.rows[0].length;
             this.headings = Array.from({length: colCount}, () => '');
         }
-        if (this.headings.length && typeof this.headings[0] == 'string') {
+        if (this.headings?.length && typeof this.headings[0] == 'string') {
             this.headings = this.headings.map(text => new CsvHeading(text));
         }
 
@@ -92,14 +92,16 @@ export class Csv {
             }
         }
 
-        this.headings.forEach((heading, i) => {
-            const types = colTypes[i];
-            heading.isSparse = types.has(CSV_DATA_TYPES.EMPTY);
-            if (heading.isSparse && types.size > 1)
-                types.delete(CSV_DATA_TYPES.EMPTY);
-            heading.type = types.size == 1 ?
-                [...types.values()][0] : CSV_DATA_TYPES.MIXED;
-        });
+        if (this.headings) {
+            this.headings.forEach((heading, i) => {
+                const types = colTypes[i];
+                heading.isSparse = types.has(CSV_DATA_TYPES.EMPTY);
+                if (heading.isSparse && types.size > 1)
+                    types.delete(CSV_DATA_TYPES.EMPTY);
+                heading.type = types.size == 1 ?
+                    [...types.values()][0] : CSV_DATA_TYPES.MIXED;
+            });
+        }
     }
     makeReorder(columns) {
         let csv = new Csv();

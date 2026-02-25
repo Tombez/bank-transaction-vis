@@ -7,6 +7,10 @@ import {Filter} from './TransactionFile.js';
 
 const toCents = x => Math.round(x * 100) / 100;
 
+const accountTypes = ['Checking', 'Saving', 'Credit', 'Certificate',
+    'Brokerage'];
+const iraTypes = ['Traditional', 'Roth'];
+
 const addBalInputs = (account, container, date = '', bal = '') => {
     const dateId = `setting-${getUnique()}`;
     const balId = `setting-${getUnique()}`;
@@ -78,6 +82,10 @@ export class Account extends Named {
             this.node.appendChild(addBtn);
         };
 
+        this.settings.add('select', 'type', `What type of account is this?`,
+            {}, ['Unset', ...accountTypes]);
+        this.settings.add('select', 'iraType', `Is this a retirement account?`,
+            {}, ['No', ...iraTypes]);
         this.settings.add('checkbox', 'invertAmounts',
             `Invert the transaction amounts?`);
     }

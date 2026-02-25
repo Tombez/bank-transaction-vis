@@ -126,6 +126,7 @@ const NamedMixin = memoMixin(Base => class extends LazyHtmlMixin(Base) {
         this.content.node.appendChild(this.settings.node);
         this.settings.node.hidden = true;
         this.node.appendChild(this.content.node);
+        this.orderChildren();
     }
     onEdit() {
         this.nameSpan.setAttribute('contenteditable', 'plaintext-only');
@@ -152,10 +153,20 @@ const NamedMixin = memoMixin(Base => class extends LazyHtmlMixin(Base) {
         if (!hasRange.length) return;
 
         this.stampRange = Range.fromRanges(hasRange.map(c => c.stampRange));
+        this.orderChildren();
+    }
+    orderChildren() {
+        if (!this.stampRange) return;
         const dfault = new Range(this.stampRange.min, this.stampRange.min);
         const orderPos = r => (r || dfault).max;
         this.children.sort(({stampRange: a}, {stampRange: b}) =>
             orderPos(b) - orderPos(a));
+        if (this.hasNode && this.content.hasNode) {
+            for (let i = 0; i < this.children.length; ++i) {
+                const child = this.children[i];
+                child.node.style.order = i + 1;
+            }
+        }
     }
     get name() {
         return this.settings.get(this.#nameSettingName);

@@ -59,15 +59,11 @@ export class LineGraph extends Graph {
         ctx.fillStyle = "black";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        if (!Number.isFinite(dataRangeY.min) || !dataRangeY.diff) {
-            ctx.fillStyle = '#fff';
-            ctx.fillText('No balance lines to show', 100, 100);
-            return;
-        }
+        const existsData = Number.isFinite(dataRangeY.min) && dataRangeY.diff;
 
         const yLabelFontSize = 22;
 
-        ctx.temp(() => {
+        if (existsData) ctx.temp(() => {
             const axisSpace = this.axisSpace;
             ctx.translate(axisSpace.x, ctx.height - axisSpace.y);
             const axisScaler = {x: (ctx.width - axisSpace.x) / ctx.width,
@@ -233,7 +229,10 @@ export class LineGraph extends Graph {
                 
                 this.drawVertical(ctx, dataRangeX, dataRangeY, percentX, barX);
             } else this.verticalIntersections = null;
-        });
+        }); else {
+            ctx.fillStyle = '#fff';
+            ctx.fillText('No data to show', 100, 100);
+        }
     
         // Draw Title:
         ctx.fillStyle = 'white';

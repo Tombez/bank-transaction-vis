@@ -29,6 +29,7 @@ export default class FlowGraph extends Graph {
         this.focused = false;
     }
     calculatePieces(layers) {
+        this.hasChanged = true;
         this.horizontalGap = (
             this.canvas.width - this.horizontalPad * 2 - layers.length * this.barWidth
         ) / (layers.length - 1);
@@ -78,8 +79,10 @@ export default class FlowGraph extends Graph {
                 }
             }
         }
+        this.hasChanged = true;
     }
-    update() {
+    animationFrame() {
+        if (!this.hasNode) return;
         this.checkHover();
         this.draw();
     }

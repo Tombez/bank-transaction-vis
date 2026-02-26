@@ -5,7 +5,22 @@ import {fromDateString, dateToMdy} from './date-utils.js';
 import {makeDraggable} from './dragAndDrop.js';
 import {Range} from './utils.js';
 
-const sanitize$Text = text => text.replaceAll(/[^-\d\.]/g, "");
+// Performance critical code, logically equivalent to:
+// const sanitizeAmountText = text => text.replace(/[^-\d\.]/g, '');
+const code0 = '0'.charCodeAt(0);
+const code9 = '9'.charCodeAt(0);
+const codeMinus = '-'.charCodeAt(0);
+const codeDecimal = '.'.charCodeAt(0);
+const sanitizeAmountText = text => {
+    const codes = [];
+    for (let i = 0; i < text.length; ++i) {
+        const code = text.charCodeAt(i);
+        if (code >= code0 && code <= code9 || code == codeMinus ||
+            code == codeDecimal) codes.push(code);
+    }
+    return String.fromCharCode(...codes);
+};
+
 const toCents = x => Math.round(x * 100) / 100;
 
 class Transaction {
@@ -188,55 +203,28 @@ export class TransactionFile extends Named {
             this.settings.has(name) && this.settings.get(name) > -1);
         super.updateFilledStyle();
     }
-    getSimplifiedCsv(accountName) {
-        const simpleCsv = this.csv.makeReorder([
-            -1, this.settings.get('date'), -1,
-            this.settings.get('description'), -1]);
-        simpleCsv.headings = `Account,Transaction Date,Posted Date,Description,Amount`.split(',');
-        if (!simpleCsv.rows.length) return simpleCsv;
-        
-        const amtCol = simpleCsv.headings.indexOf('Amount');
-        const indCol = this.settings.get('cdIndicator');
-        for (let y = 0; y < simpleCsv.rows.length; ++y) {
-            const row = simpleCsv.rows[y];
-            const oldRow = this.csv.rows[y];
-            let debit = sanitize$Text(oldRow[this.settings.get('debit')]);
-            const credit = sanitize$Text(oldRow[this.settings.get('credit')]);
-            const oneCol = this.settings.get('debit') === this.settings.get('credit');
-            const isDebit = this.settings.get('hasCdIndicator') && indCol > -1 &&
-                /debit/i.test(oldRow[indCol]) || !oneCol && debit;
-            if (isDebit && !debit.startsWith('-'))
-                debit = '-' + debit;
-            row[amtCol] = isDebit ? debit : credit;
-        }
-
-        for (const row of simpleCsv.rows) {
-            const accCol = simpleCsv.headings.map(h => h.text).indexOf('Account');
-            row[accCol] = accountName;
-
-            const dateCol = simpleCsv.headings.map(h => h.text).indexOf('Transaction Date');
-            row[dateCol] = dateToMdy(fromDateString(row[dateCol]));
-        }
-        return simpleCsv;
-    }
     getTransactions() {
         const transactions = [];
-        const indCol = this.settings.get('cdIndicator');
+        const hasCdIndicator = this.settings.get('hasCdIndicator');
+        const indIndex = this.settings.get('cdIndicator');
+        const dateIndex = this.settings.get('date');
+        const descIndex = this.settings.get('description');
+        const debitIndex = this.settings.get('debit');
+        const creditIndex = this.settings.get('credit');
+        const balIndex = this.settings.get('balance');
+        const oneCol = debitIndex === creditIndex;
         for (const row of this.csv.rows) {
-            const date = row[this.settings.get('date')];
-            const desc = row[this.settings.get('description')];
-            let debit = sanitize$Text(row[this.settings.get('debit')]);
-            const credit = sanitize$Text(row[this.settings.get('credit')]);
-            const oneCol = this.settings.get('debit') === this.settings.get('credit');
-            const isDebit = this.settings.get('hasCdIndicator') && indCol > -1 &&
-                /debit/i.test(row[indCol]) || !oneCol && debit;
+            const date = row[dateIndex];
+            const desc = row[descIndex];
+            let debit = sanitizeAmountText(row[debitIndex]);
+            const isDebit = hasCdIndicator && indIndex > -1 &&
+                /debit/i.test(row[indIndex]) || !oneCol && debit;
             if (isDebit && !debit.startsWith('-'))
                 debit = '-' + debit;
-            const amount = isDebit ? debit : credit;
+            const amount = isDebit ? debit : sanitizeAmountText(row[creditIndex]);
             const transaction = new Transaction(date, desc, amount, row, this);
-            const balIndex = this.settings.get('balance');
             if (balIndex != undefined && balIndex > -1 && row[balIndex])
-                transaction.balance = +sanitize$Text(row[balIndex]);
+                transaction.balance = +sanitizeAmountText(row[balIndex]);
 
             transactions.push(transaction);
         }
@@ -245,15 +233,17 @@ export class TransactionFile extends Named {
     compile() {
         if (!this.isFullyFilled) return;
         this.getTransactions();
-        const stamps = this.transactions.map(t => t.timestamp);
-        if (stamps.length)
+        if (this.transactions.length) {
+            const stamps = this.transactions[Symbol.iterator]().map(t =>
+                t.timestamp);
             this.stampRange = Range.fromValues(stamps);
+        }
         this.balancePoints = this.getBalancePoints();
     }
     getBalancePoints() {
         let points = [];
         const hasBalTs = this.transactions.filter(t => t.balance != undefined);
-        hasBalTs.sort((a, b) => a.timestamp - b.timeStamp);
+        hasBalTs.sort((a, b) => a.timestamp - b.timestamp);
         for (let i = 0; i < hasBalTs.length; ++i) {
             const time = hasBalTs[i].timestamp;
             let end = i;

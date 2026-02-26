@@ -122,7 +122,7 @@ export default class HierarchyGraph extends Graph {
             ]
         };
     }
-    update() {
+    animationFrame() {
         this.calculate();
         this.draw();
     }

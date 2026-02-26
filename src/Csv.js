@@ -38,7 +38,13 @@ export const readCsv = text => {
 
 
 const onlyNumericWithDecimal = /^-?\d*\.?\d*$/;
-const withoutLetters = /^[^a-zA-Z]+$/;
+const isLetter = code => code >= 97 && code <= 122 ||
+      code >= 65 && code <= 90;
+const hasNoLetters = str => {
+    for (let i = 0; i < str.length; ++i)
+        if (isLetter(str.charCodeAt(i))) return false;
+    return true;
+};
 
 const couldBeHeaderValue = value => !value ||
     !onlyNumericWithDecimal.test(value) && !isDateStr(value);
@@ -53,8 +59,8 @@ export const CSV_DATA_TYPES = {
 
 export const typeOf = str => {
     if (str === '') return CSV_DATA_TYPES.EMPTY;
-    if (isDateStr(str)) return CSV_DATA_TYPES.DATE;
-    if (withoutLetters.test(str)) return CSV_DATA_TYPES.NUMBER;
+    if (typeof str == 'string' && isDateStr(str)) return CSV_DATA_TYPES.DATE;
+    if (hasNoLetters(str)) return CSV_DATA_TYPES.NUMBER;
     return CSV_DATA_TYPES.STRING;
 };
 

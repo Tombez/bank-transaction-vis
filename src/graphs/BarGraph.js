@@ -55,12 +55,6 @@ export default class BarGraph extends Graph {
         clearInterval(this.tooltipUpdateInterval);
         this.tooltipVLine.style.display = this.tooltipHLine.style.display = 'none';
     }
-    update() {
-        if (this.hasNode && this.hasChanged) {
-            this.hasChanged = false;
-            this.draw(this.ctx);
-        }
-    }
     tooltipUpdate() {
         let rect = this.canvas.getBoundingClientRect();
         this.tooltipVLine.style.left = (this.pointer.x - rect.left) + 'px';
@@ -92,7 +86,8 @@ export default class BarGraph extends Graph {
             Math.max(this.options.fontSize / 2 - dataWidth, 0) : 0;
         this.labelScale = (this.canvas.width - this.valueOffset - labelEndSpace) / (numLabels - (this.options.lineVsBar ? 0.5 : 0));
     }
-    draw(ctx) {
+    draw() {
+        const ctx = this.ctx;
         const textColor = '#fff';
         ctx.save();
         ctx.fillStyle = "#000";

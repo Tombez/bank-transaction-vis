@@ -30,7 +30,7 @@ let activityRange;
 
 const updateloop = () => {
     for (const graph of graphs) {
-        if (graph.update) graph.update();
+        if (graph.animationFrame) graph.animationFrame();
     }
     requestAnimationFrame(updateloop);
 };
@@ -232,9 +232,6 @@ const compileTransactionsDebounced = () => {
     let transactions = banksRoot.transactions;
     transactions.sort((a, b) => a.timestamp - b.timestamp);
 
-    // const bankListDiv = document.querySelector('#bank-list');
-    // for (const bank of bankList) bankListDiv.appendChild(bank.node);
-
     removeGraphs();
 
     tViewer = recreateTViewer(transactions);
@@ -242,7 +239,6 @@ const compileTransactionsDebounced = () => {
     const accounts = bankList.map(bank => bank.accounts).flat();
     if (!accounts.length) return;
 
-    loadTransactions(transactions);
     calculateDailyBalances(accounts);
     
     const accountsWithTs = accounts.filter(a => a.transactions.length);
@@ -391,20 +387,18 @@ const updateActivityGraphs = () => {
     const banks = bankList;
     const range = activityRange;
     const dayCount = Math.round(range.diff / Date.msDay) + 1;
-    let days = new BitArray(dayCount);
-    let accSum = new BitArray(dayCount);
-    let bankSum = new BitArray(dayCount);
+
     for (const bank of banks) {
-        bankSum.data.fill(0);
+        let bankSum = new BitArray(dayCount);
         for (const account of bank.accounts) {
-            accSum.data.fill(0);
+            let accSum = new BitArray(dayCount);
             for (const tranFile of account.transactionFiles) {
-                days.data.fill(0);
+                let days = new BitArray(dayCount);
                 ActivityGraph.populateDays(days, tranFile.transactions, range);
-                tranFile.activityGraph?.update(days, range, tranFile.balancePoints);
+                tranFile.activityGraph.update(days, range, tranFile.balancePoints);
                 accSum.orEquals(days);
             }
-            account.activityGraph?.update(accSum, range, account.balancePoints);
+            account.activityGraph.update(accSum, range, account.balancePoints);
             bankSum.orEquals(accSum);
         }
         bank.activityGraph.update(bankSum, range);

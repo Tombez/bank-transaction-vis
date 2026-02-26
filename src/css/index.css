@@ -443,6 +443,9 @@ label[for="transaction-input"] {
 .context-menu-item:hover {
     background-color: #3e4046;
 }
+.graph-container {
+    position: relative;
+}
 .graph-container:has(>.activity-graph) {
     padding-bottom: 13px;
 }

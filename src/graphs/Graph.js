@@ -9,6 +9,7 @@ export class Graph extends LazyHtml {
         this.size = size;
         this.pointer = {x: 0, y: 0};
         this.touchAction = 'auto';
+        this.hasChanged = true;
     }
     attachListeners() {
         for (let eventName of ['down', 'move', 'enter', 'leave', 'up']) {
@@ -21,7 +22,6 @@ export class Graph extends LazyHtml {
     generateHtml() {
         super.generateHtml();
         this.node.classList.add('graph-container');
-        this.node.style = 'position: relative;';
         this.canvas = document.createElement('canvas');
         this.canvas.className = 'graph no-select';
         this.canvas.style['touch-action'] = this.touchAction;
@@ -39,12 +39,13 @@ export class Graph extends LazyHtml {
 
         this.attachListeners();
     }
-    update() {
-        if (this.hasChanged) {
+    animationFrame() {
+        if (this.hasNode && this.hasChanged) {
             this.hasChanged = false;
             this.draw();
         }
     }
+    draw() {}
     setPointer(event) {
         let rect = event.target.getBoundingClientRect();
         const ratio = this.size.x / rect.width;

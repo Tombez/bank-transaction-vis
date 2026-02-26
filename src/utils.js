@@ -38,9 +38,22 @@ export class Range {
         return this.min + this.diff / 2;
     }
     static fromValues(values) {
-        if (!values.length)
-            throw new Error('Cannot create Range from no values.');
-        return new Range(best(values), best(values, a => a, 'max'));
+        if (typeof values.next == 'function') { // iterator
+            const first = values.next();
+            if (first.done)
+                throw new Error('Cannot create Range from no values.');
+            let min = first.value;
+            let max = first.value;
+            for (const value of values) {
+                if (value < min) min = value;
+                if (value > max) max = value;
+            }
+            return new Range(min, max);
+        } else {
+            if (!values.length)
+                throw new Error('Cannot create Range from no values.');
+            return new Range(best(values), best(values, a => a, 'max'));
+        }
     }
     static fromRanges(ranges) {
         if (!ranges.length)

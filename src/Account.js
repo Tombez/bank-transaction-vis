@@ -1,5 +1,6 @@
 import {makeDraggable, makeDroppable} from './dragAndDrop.js';
-import {Named, getUnique} from './Named.js';
+import {Named} from './Named.js';
+import {getUnique} from './Settings.js';
 import {TransactionFile} from './TransactionFile.js';
 import {fromDateString, dateToYmd} from './date-utils.js';
 import {Range} from './utils.js';
@@ -155,6 +156,7 @@ export class Account extends Named {
         super.compile();
         if (this.settings.get('invertAmounts'))
             for (const tran of this.transactions) tran.amount *= -1;
+        this.type = accountTypes[this.settings.get('type')];
         this.autoBalPoints = [];
         for (const tranFile of this.transactionFiles) {
             if (tranFile.balancePoints) this.autoBalPoints = this.autoBalPoints

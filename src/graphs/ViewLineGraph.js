@@ -33,8 +33,10 @@ export class ViewLineGraph extends LineGraph {
         const rangeX = this.getViewRange();
         let min = Infinity;
         let max = -Infinity;
-        for (const line of this.values) {
-            if (!line.label.active) continue;
+        for (let i = 0; i < this.values.length; ++i) {
+            const line = this.values[i];
+            const label = this.labels[i];
+            if (!label.active) continue;
             let oneInRange = false;
             for (const point of line) {
                 const stamp = point.x;

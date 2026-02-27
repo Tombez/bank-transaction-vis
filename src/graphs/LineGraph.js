@@ -9,13 +9,16 @@ export class LineGraph extends Graph {
     constructor(...args) {
         super(...args);
         this.axisSpace = {x: 75, y: 30};
-        this.generateColors();
         this.shouldDrawVertical = false;
+        this.update();
+    }
+    update() {
+        this.generateColors();
         this.labels = this.labels.map(l => ({name: l, active: true}));
-        for (let i = 0; i < this.values.length; ++i)
-            this.values[i].label = this.labels[i];
+        this.hasChanged = true;
     }
     generateColors() {
+        if (!this.values?.length) return;
         let colors = Array.from({length: this.values.length}, () => new Color());
         let count = 0;
         for (let step = 0.1; count < 20 && colors.length > 1; step *= 0.6, count++) {
@@ -74,8 +77,10 @@ export class LineGraph extends Graph {
             ctx.lineWidth = 1 + window.devicePixelRatio;
             ctx.globalAlpha = 0.7;
             ctx.lineJoin = 'round';
-            for (const line of this.values) {
-                if (!line.label.active) continue;
+            for (let i = 0; i < this.values.length; ++i) {
+                const label = this.labels[i];
+                if (!label.active) continue;
+                const line = this.values[i];
                 ctx.strokeStyle = line.color.toString();
                 let dataPoints = [];
                 for (const point of line) {

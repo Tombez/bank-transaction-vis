@@ -106,7 +106,7 @@ const exportBtv = () => {
 };
 const loadRules = rules => {
     for (const rule of rules) loadRule(rule);
-    console.log('classifiers', classifiers);
+    console.debug('classifiers', classifiers);
 };
 const loadRule = (rule, parentCategory) => {
     let category = rule.category;

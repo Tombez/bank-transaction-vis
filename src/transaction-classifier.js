@@ -247,9 +247,11 @@ const compileTransactionsDebounced = () => {
     const stampRange = Range.fromRanges(accountsWithTs.map(a => a.stampRange));
     activityRange = stampRange;
     const balRange = Range.fromRanges(accountsWithTs.map(a => a.balRange));
+    banksRoot.balRange = balRange;
+    banksRoot.accountsWithTs = accountsWithTs;
     
-    makeBalancesGraph(accountsWithTs, stampRange, balRange);
-    makeNetWorthGraph(accountsWithTs, stampRange, balRange);
+    const event = new CustomEvent('change');
+    document.querySelector('#chartSelect').dispatchEvent(event);
     updateActivityGraphs();
 };
 const recreateTViewer = (transactions) => {
@@ -337,8 +339,7 @@ const calculateDailyBalances = (accounts) => {
 };
 const makeBalancesGraph = (accounts, stampRange, balRange) => {
     const graph = new AccountBalancesGraph(accounts, stampRange, balRange);
-    graphs.push(graph);
-    document.querySelector('#chart').appendChild(graph.node);
+    return graph;
 };
 const makeNetWorthGraph = (accounts, stampRange, balRange) => {
     const totalDailyBalance = [];
@@ -440,8 +441,8 @@ const labelTransactions = transactions => {
         let [label, classifier] = labelTransaction(date, desc, amount);
         if (!label) {
             label = 'Uncategorized';
-            let elm = document.createElement("pre");
-            elm.textContent = transaction.cols.join(",");
+            // let elm = document.createElement("pre");
+            // elm.textContent = transaction.row.join(",");
             // unlabeledDiv.appendChild(elm);
             // unlabeledDiv.style.display = "block";
         }
@@ -505,9 +506,7 @@ const labelTransactions = transactions => {
 
 const makeHPieGraph = (root, title) => {
     let graph = new HierarchalPieGraph(root, title, canvasSize);
-    graphs.push(graph);
     console.debug(title + " root:", graph.root);
-    document.querySelector('#chart').appendChild(graph.node);
     return graph;
 };
 const makeFlowGraph = ({root, income}, title) => {
@@ -551,8 +550,6 @@ const makeFlowGraph = ({root, income}, title) => {
     }
 
     let graph = new FlowGraph(layers, title, {x: 1000, y: 600});
-    graphs.push(graph);
-    document.querySelector('#chart').appendChild(graph.node);
     return graph;
 };
 const fillLayers = (root, layers, index = 0) => { // recursive
@@ -641,7 +638,41 @@ const afterPageLoad = event => {
     let tabBar = new TabBar();
     document.querySelector('header').after(tabBar.node);
     tabBar.addTab('Banks', document.querySelector('#bank-tab'));
-    tabBar.addTab('Charts', document.querySelector('#chart'));
+
+    const chartDiv = document.querySelector('#chart');
+    tabBar.addTab('Charts', chartDiv);
+    const selectLabel = document.createElement('label');
+    selectLabel.textContent = 'Chart Type: ';
+    selectLabel.for = '#chartSelect';
+    const chartSelect = document.createElement('select');
+    chartSelect.id = 'chartSelect';
+    chartSelect.innerHTML = `
+        <option value="balances">Balances</option>
+        <option value="pie">Pie</option>
+        <option value="flow">Flow/Sankey</option>
+    `;
+    chartSelect.addEventListener('change', event => {
+        removeGraphs();
+        const {accountsWithTs, balRange, transactions} = banksRoot;
+        const roots = labelTransactions(transactions);
+        let graph;
+        switch(event.target.value) {
+            case 'balances':
+                graph = makeBalancesGraph(accountsWithTs, activityRange, balRange);
+                break;
+            case 'pie':
+                graph = makeHPieGraph(roots.root, 'Spending');
+                break;
+            case 'flow':
+                graph = makeFlowGraph(roots, 'Income and Spending');
+                break;
+        }
+        graphs.push(graph);
+        chartDiv.insertBefore(graph.node, chartDiv.firstChild);
+    });
+    chartDiv.appendChild(selectLabel);
+    chartDiv.appendChild(chartSelect);
+
     const transactionElm = document.querySelector('#transactions');
     transactionTab = tabBar.addTab('Transactions', transactionElm);
 

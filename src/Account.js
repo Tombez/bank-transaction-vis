@@ -5,6 +5,7 @@ import {TransactionFile} from './TransactionFile.js';
 import {fromDateString, dateToYmd} from './date-utils.js';
 import {Range} from './utils.js';
 import {Filter} from './TransactionFile.js';
+import {Csv} from './Csv.js';
 
 const toCents = x => Math.round(x * 100) / 100;
 
@@ -52,7 +53,7 @@ export class Account extends Named {
             titleClass: 'acc-title',
         });
         this.transactionFiles = this.children;
-        this.headerFormats = [];
+        this.headerFormats = new Map();
         this.isFullyFilled = false;
         this.balanceDiscrepancies = [];
         this.statsDiv = null;
@@ -115,6 +116,7 @@ export class Account extends Named {
         statsDiv.className = 'stats';
         this.content.node.appendChild(statsDiv);
         this.statsDiv = statsDiv;
+        this.displayHeaderFormats();
         this.displayDiscrepancies();
 
         for (const tranFile of this.transactionFiles)
@@ -125,16 +127,26 @@ export class Account extends Named {
         if (this.content.hasNode) this.content.node.appendChild(tranFile.node);
         tranFile.account = this;
         if (tranFile.csv.hasHeader) {
-            const header = tranFile.csv.headings.map(h => h.text).join();
-            if (!this.headerFormats.includes(header))
-                this.headerFormats.push(header);
+            const header = tranFile.csv.headings.map(h =>
+                Csv.escapeValue(h.text)).join();
+            let headerList = this.headerFormats.get(header);
+            if (!headerList) this.headerFormats.set(header, headerList = []);
+            headerList.push(tranFile);
         }
         this.changed();
     }
     removeTransactionFile(tranFile) {
-        const index = this.transactionFiles.indexOf(tranFile);
-        if (index > -1) {
-            this.transactionFiles.splice(index, 1);
+        const removeItem = (array, item) => {
+            const index = array.indexOf(item);
+            if (index > -1) array.splice(index, 1);
+        };
+        removeItem(this.transactionFiles, tranFile);
+        if (tranFile.csv.hasHeader) {
+            const header = tranFile.csv.headings.map(h =>
+                Csv.escapeValue(h.text)).join();
+            const headerList = this.headerFormats.get(header) || [];
+            removeItem(headerList, tranFile);
+            if (!headerList.length) this.headerFormats.delete(header);
         }
         tranFile.node.parentNode.removeChild(tranFile.node);
         tranFile.account = null;
@@ -165,6 +177,7 @@ export class Account extends Named {
         this.balancePoints = this.autoBalPoints
             .concat(this.manualBalPoints || []);
         this.balancePoints.sort((a, b) => a.timestamp - b.timestamp);
+        this.displayHeaderFormats();
         this.checkBalancePointContinuity();
     }
     orderBalancePointContainers() {
@@ -217,10 +230,37 @@ export class Account extends Named {
 
         this.displayDiscrepancies();
     }
+    displayHeaderFormats() {
+        if (!this.statsDiv) return;
+        let headersList = this.statsDiv.querySelector('.headersList');
+        if (!headersList) {
+            headersList = document.createElement('div');
+            headersList.className = 'headersList';
+            this.statsDiv.appendChild(headersList);
+        }
+        if (!this.headerFormats.size) {
+            headersList.innerHTML = '';
+            return;
+        }
+        headersList.innerHTML = '<h4>Header Formats</h4>';
+        for (const [headerFormat, files] of this.headerFormats.entries()) {
+            const span = document.createElement('span');
+            const plural = files.length > 1 ? 's' : '';
+            span.textContent = `${files.length} file${plural}: ` + headerFormat;
+            headersList.appendChild(span);
+        }
+    }
     displayDiscrepancies() {
         if (!this.statsDiv) return;
-        while(this.statsDiv.childNodes.length)
-            this.statsDiv.removeChild(this.statsDiv.childNodes[0]);
+        let discrepancyDiv = this.statsDiv.querySelector('.discrepancyList');
+        if (discrepancyDiv) {
+            while(discrepancyDiv.lastChild)
+                discrepancyDiv.removeChild(discrepancyDiv.lastChild);
+        } else {
+            discrepancyDiv = document.createElement('div');
+            discrepancyDiv.className = 'discrepancyList';
+            this.statsDiv.appendChild(discrepancyDiv);
+        }
         for (const discrepancy of this.balanceDiscrepancies) {
             const row = document.createElement('div');
             const startDate = new Date(discrepancy.period.min);
@@ -247,7 +287,7 @@ export class Account extends Named {
             const span = document.createElement('span');
             span.textContent = ` $${discrepancy.prevBal} -> $${discrepancy.balance}, discrepancy: ${discrepancy.diff}`;
             row.appendChild(span);
-            this.statsDiv.appendChild(row);
+            discrepancyDiv.appendChild(row);
         }
     }
     readBalancePoints() {

@@ -171,6 +171,16 @@ td, th {
 .btn-wrapper {
     display: flex;
 }
+.headersList {
+    white-space: nowrap;
+    overflow-x: auto;
+}
+.headersList > h4 {
+    margin: 8px;
+}
+.headersList > span {
+    display: block;
+}
 .page-bar {
     justify-content: left;
     padding-top: 0.3vh;

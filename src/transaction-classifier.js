@@ -206,7 +206,7 @@ const addTransactionFile = (tranFile) => {
         const header = tranFile.csv.headings.map(h => h.text).join();
         bank = bankList.find(
             bank => account = bank.accounts.find(
-                a => a.headerFormats.includes(header)));
+                a => a.headerFormats.has(header)));
     }
     if (!account) { // create new account
         account = new Account(tranFile.name);

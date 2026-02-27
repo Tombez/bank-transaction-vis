@@ -19,25 +19,18 @@ export const mdyToDate = (mdy, sep = "/") => {
 };
 const ymdRegex = /^(?<y>\d{4})(?<sep>[^\d])(?<m>\d\d?)\2(?<d>\d\d?)$/;
 const mdyRegex = /^(?<m>\d\d?)(?<sep>[^\d])(?<d>\d\d?)\2(?<y>\d{4})$/;
+const ymdRegexNoCap = /^\d{4}[^\d]\d\d?[^\d]\d\d?$/;
+const mdyRegexNoCap = /^\d\d?[^\d]\d\d?[^\d]\d{4}$/;
 export const isDateNumerical = s => ymdRegex.exec(s) || mdyRegex.exec(s);
 const writtenDateRegex = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) \d\d? \d\d\d\d$/i;
 export const isDateWritten = s => writtenDateRegex.test(s);
 // export const isDateStr = s => isDateNumerical(s) || isDateWritten(s);
 const isDigit = code => code >= 48 && code <= 57;
-const ymdDigitOrder = [1, 1, 1, 1, 0, 1, 1, 0, 1, 1].map(Boolean);
-const mdyDigitOrder = [1, 1, 0, 1, 1, 0, 1, 1, 1, 1].map(Boolean);
 export const isDateStr = s => {
     if (s.length > 11) return false;
-    if (!isDigit(s.charCodeAt(0))) { // could be written
-        return isDateWritten(s);
-    } else if (s.length <= 10) { // could be numerical date
-        if (!isDigit(s.charCodeAt(1))) return false;
-        const order = isDigit(s.charCodeAt(2)) ? ymdDigitOrder : mdyDigitOrder;
-        for (let i = 3; i < order.length; ++i)
-        if (isDigit(s.charCodeAt(i)) != order[i]) return false;
-        return true;
-    }
-    return false;
+    return isDigit(s.charCodeAt(0)) ?
+        ymdRegexNoCap.test(s) || mdyRegexNoCap.test(s) :
+        isDateWritten(s);
 };
 export const isYmd = str => /^\d{4}/.test(str);
 export const fromDateString = (dateStr) => {

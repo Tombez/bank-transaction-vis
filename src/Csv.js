@@ -45,7 +45,12 @@ const hasNoLetters = str => {
         if (isLetter(str.charCodeAt(i))) return false;
     return true;
 };
-
+const isDigit = code => code >= 48 && code <= 57;
+const hasDigit = str => {
+    for (let i = 0; i < str.length; ++i) if (isDigit(str.charCodeAt(i)))
+        return true;
+    return false;
+};
 const couldBeHeaderValue = value => !value ||
     !onlyNumericWithDecimal.test(value) && !isDateStr(value);
 
@@ -60,7 +65,7 @@ export const CSV_DATA_TYPES = {
 export const typeOf = str => {
     if (str === '') return CSV_DATA_TYPES.EMPTY;
     if (typeof str == 'string' && isDateStr(str)) return CSV_DATA_TYPES.DATE;
-    if (hasNoLetters(str)) return CSV_DATA_TYPES.NUMBER;
+    if (hasNoLetters(str) && hasDigit(str)) return CSV_DATA_TYPES.NUMBER;
     return CSV_DATA_TYPES.STRING;
 };
 
@@ -101,11 +106,12 @@ export class Csv {
         if (this.headings) {
             this.headings.forEach((heading, i) => {
                 const types = colTypes[i];
-                heading.isSparse = types.has(CSV_DATA_TYPES.EMPTY);
-                if (heading.isSparse && types.size > 1)
+                const multiple = types.size > 1;
+                heading.isSparse = multiple && types.has(CSV_DATA_TYPES.EMPTY);
+                if (heading.isSparse && multiple)
                     types.delete(CSV_DATA_TYPES.EMPTY);
-                heading.type = types.size == 1 ?
-                    [...types.values()][0] : CSV_DATA_TYPES.MIXED;
+                heading.type = types.size == 1 ? types.values().next().value :
+                    CSV_DATA_TYPES.MIXED;
             });
         }
     }

@@ -145,6 +145,7 @@ td, th {
     box-shadow: 0 0 5px black;
     margin-top: 5px;
     background: var(--main-gradient);
+    border-radius: 10px;
 }
 .bank-list, .content {
     display: flex;
@@ -231,6 +232,9 @@ td, th {
 .icon-delete  {
     background-image: url("../../assets/trash-bin.svg");
 }
+.icon-delete:hover {
+    background-color: darkred;
+}
 .icon-add {
     background-image: url("../../assets/plus.svg");
 }
@@ -267,7 +271,7 @@ td, th {
 }
 span[contenteditable="plaintext-only"] {
     cursor: text;
-    padding: 3px;
+    padding: 0 8px;
     outline: 1px solid gray;
     border-radius: 5px;
     background: #3b3b3b;
@@ -309,12 +313,32 @@ span[contenteditable="plaintext-only"]:focus {
 .hiddenAnimated {
     height: 0px;
 }
-#export-btn {
+#upload, #export-btn {
     margin: 8px;
+}
+#bank-list-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 800px;
+}
+#add-bank-btn {
+    width: 50%;
+    min-width: fit-content;
 }
 #bank-list {
     margin-left: 8px;
     max-width: 800px;
+    width: stretch;
+    display: flex;
+    flex-direction: column;
+}
+.bank-container {
+    background: rgb(20, 20, 35);
+    margin-top: 10px;
+}
+.account-container {
+    background: rgb(30, 20, 20);
 }
 .transaction-file-container > .header:not(.fully-filled) .icon-edit,
 :not(.transaction-file-container) > .header:not(.fully-filled) .icon-expand {
@@ -494,6 +518,12 @@ label[for="transaction-input"] {
     }
     input[type="text"], select {
         display: block;
+        padding: 5px;
+        font-size: medium;
+    }
+    input[type=checkbox] {
+        width: 1.5em;
+        height: 1.5em;
     }
     .balance-point-row > input {
         display: inline;

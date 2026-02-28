@@ -16,6 +16,7 @@ const Addable = memoMixin(Base => class extends Base {
         this.btnWrapper.appendChild(addBtn);
         addBtn.addEventListener('click', event => {
             this.add();
+            if (typeof this.expand == 'function') this.expand();
         });
     }
     add() {}
@@ -123,7 +124,7 @@ export class Bank extends Addable(Named) {
         const delimiterRgx = /[-_/\/\. ]/g;
         bankName = fileNameNoExt.split(delimiterRgx)
             .filter(s =>
-                !/^transactions?$/i.test(s) &&
+                !/^transactions?|checking|savings?|credit|brokerage$/i.test(s) &&
                 !/^\d*$/.test(s) &&
                 s
             ).map(capitalize).join(' ') || 'Default Bank';

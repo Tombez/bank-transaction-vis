@@ -114,28 +114,36 @@ const NamedMixin = memoMixin(Base => class extends LazyHtmlMixin(Base) {
 });
 
 const Collapsable = memoMixin(Base => class extends Base {
+    #collapseBtn;
     constructor(...args) {
         super(...args);
     }
     generateHtml() {
         super.generateHtml();
         const collapseBtn = document.createElement('button');
+        this.#collapseBtn = collapseBtn;
         collapseBtn.className = 'icon icon-expand';
         collapseBtn.ariaLabel = collapseBtn.title = 'Expand';
         this.btnWrapper.appendChild(collapseBtn);
         collapseBtn.addEventListener('click', event => {
             if (!this.content.hasNode || this.content.node.hidden) {
-                this.content.node.hidden = false;
-                collapseBtn.classList.remove('icon-expand');
-                collapseBtn.classList.add('icon-collapse');
-                collapseBtn.ariaLabel = collapseBtn.title = 'Collapse';
+                this.expand();
             } else {
-                this.content.node.hidden = true;
-                collapseBtn.classList.remove('icon-collapse');
-                collapseBtn.classList.add('icon-expand');
-                collapseBtn.ariaLabel = collapseBtn.title = 'Expand';
+                this.collapse();
             }
         });
+    }
+    collapse() {
+        this.content.node.hidden = true;
+        this.#collapseBtn.classList.remove('icon-collapse');
+        this.#collapseBtn.classList.add('icon-expand');
+        this.#collapseBtn.ariaLabel = this.#collapseBtn.title = 'Expand';
+    }
+    expand() {
+        this.content.node.hidden = false;
+        this.#collapseBtn.classList.remove('icon-expand');
+        this.#collapseBtn.classList.add('icon-collapse');
+        this.#collapseBtn.ariaLabel = this.#collapseBtn.title = 'Collapse';
     }
 });
 
@@ -172,8 +180,7 @@ const Editable = memoMixin(Base => class extends Base {
         editBtn.addEventListener('click', event => {
             const deleteBtn = this.node.querySelector('.icon-delete');
             if (!this.settings.hasNode || this.settings.node.hidden) {
-                const expandBtn = this.header.querySelector('.icon-expand:not(.icon-collapse)');
-                if (expandBtn) expandBtn.click();
+                if (typeof this.expand == 'function') this.expand();
                 this.settings.node.hidden = false;
                 editBtn.classList.remove('icon-edit');
                 editBtn.classList.add('icon-done');
@@ -181,6 +188,7 @@ const Editable = memoMixin(Base => class extends Base {
                 if (deleteBtn) deleteBtn.hidden = false;
                 if (this.onEdit) this.onEdit();
             } else {
+                if (typeof this.collapse == 'function') this.collapse();
                 this.settings.node.hidden = true;
                 editBtn.classList.remove('icon-done');
                 editBtn.classList.add('icon-edit');

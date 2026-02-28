@@ -80,7 +80,7 @@ const readBtv = (text) => {
         for (const bankObj of bankObjs) {
             const bank = Bank.decode(bankObj);
             addBank(bank);
-            bank.node.querySelector('.icon-collapse')?.click();
+            bank.collapse();
         }
     } catch (error) {
         console.error(error);
@@ -209,7 +209,7 @@ const addTransactionFile = (tranFile) => {
                 a => a.headerFormats.has(header)));
     }
     if (!account) { // create new account
-        account = new Account(tranFile.name);
+        account = new Account('Default Account');
         if (!bank) {
             bank = Bank.findFromFile(tranFile, bankList);
             if (!(bank instanceof Bank)) {
@@ -221,6 +221,8 @@ const addTransactionFile = (tranFile) => {
         bank.addAccount(account);
     }
     account.addTransactionFile(tranFile);
+    account.expand();
+    account.bank.expand();
 };
 const compileTransactions = () => {
     debounceFunc(compileTransactionsDebounced, COMPILE_COOLDOWN);

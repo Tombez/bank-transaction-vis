@@ -215,7 +215,7 @@ export class TransactionFile extends Named {
         const oneCol = debitIndex === creditIndex;
         for (const row of this.csv.rows) {
             const date = row[dateIndex];
-            const desc = row[descIndex];
+            const desc = row[descIndex] || '';
             let debit = sanitizeAmountText(row[debitIndex]);
             const isDebit = hasCdIndicator && indIndex > -1 &&
                 /debit/i.test(row[indIndex]) || !oneCol && debit;

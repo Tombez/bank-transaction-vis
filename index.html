@@ -40,13 +40,14 @@
         </a>
     </header>
     <div id="bank-tab">
-        <label for="transaction-input">
-        Upload transactions:
-        <input id="transaction-input" type="file" accept=".csv,.txt,.btv" multiple title=".csv .txt .btv"/>
+        <label id="upload" for="transaction-input">
+            Upload transactions:
+            <input id="transaction-input" type="file" accept=".csv,.txt,.btv" multiple title=".csv .txt .btv"/>
         </label>
         <button id="export-btn">Export</button>
-        <div id="bank-list">
-            <button id="add-bank-btn">Add Bank</button>
+        <div id="bank-list-container">
+            <button id="add-bank-btn">New Bank</button>
+            <div id="bank-list"></div>
         </div>
     </div>
     <div id="chart"></div>

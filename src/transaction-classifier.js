@@ -27,6 +27,7 @@ let transactionTab = null;
 let compileCounter = 0;
 let tViewer;
 let activityRange;
+let destinationAccount;
 
 const updateloop = () => {
     for (const graph of graphs) {
@@ -68,6 +69,7 @@ const transactionInputChange = event => {
             }
         }
         compileTransactions();
+        destinationAccount = null;
     });
     event.target.value = "";
 };
@@ -198,9 +200,12 @@ const createNewBank = () => {
     addBank(bank);
 };
 const addTransactionFile = (tranFile) => {
-    let account;
-    let bank = bankList.find(
-        bank => account = bank.accounts.find(a => a.name == tranFile.name));
+    let account = destinationAccount;
+    let bank;
+    if (!account) {
+        bank = bankList.find(
+            bank => account = bank.accounts.find(a => a.name == tranFile.name));
+    }
     if (!account && tranFile.csv.hasHeader) {
         // Identify account based on csv header
         const header = tranFile.csv.headings.map(h => h.text).join();
@@ -209,7 +214,11 @@ const addTransactionFile = (tranFile) => {
                 a => a.headerFormats.has(header)));
     }
     if (!account) { // create new account
-        account = new Account('Default Account');
+        const index = Account.searchTranFileForAccountCol(tranFile);
+        const hasAccountName = index > -1 && tranFile.csv.rows.length;
+        let accountName = hasAccountName ? tranFile.csv.rows[0][index] :
+            'Default Account';
+        account = new Account(accountName);
         if (!bank) {
             bank = Bank.findFromFile(tranFile, bankList);
             if (!(bank instanceof Bank)) {
@@ -381,10 +390,8 @@ const makeNetWorthGraph = (accounts, stampRange, balRange) => {
 
     const size = {x: canvasSize.x, y: 400};
     let netWorthGraph = new BarGraph("Net Worth Over Time", totalDailyBalance, labels, size);
-    console.debug("net worth graph", netWorthGraph);
     window.netWorthGraph = netWorthGraph;
-    graphs.push(netWorthGraph);
-    document.querySelector('#chart').appendChild(netWorthGraph.node);
+    return netWorthGraph;
 };
 const updateActivityGraphs = () => {
     const banks = bankList;
@@ -652,6 +659,7 @@ const afterPageLoad = event => {
         <option value="balances">Balances</option>
         <option value="pie">Pie</option>
         <option value="flow">Flow/Sankey</option>
+        <option value="net-worth">Net Worth</option>
     `;
     chartSelect.addEventListener('change', event => {
         removeGraphs();
@@ -667,6 +675,9 @@ const afterPageLoad = event => {
                 break;
             case 'flow':
                 graph = makeFlowGraph(roots, 'Income and Spending');
+                break;
+            case 'net-worth':
+                graph = makeNetWorthGraph(accountsWithTs, activityRange, balRange);
                 break;
         }
         graphs.push(graph);
@@ -695,9 +706,17 @@ const afterPageLoad = event => {
         tViewer.update();
         transactionTab.childNodes[1]?.click();
     });
-
     document.addEventListener('re-draw activity', () => {
         debounceFunc(updateActivityGraphs, COMPILE_COOLDOWN);
+    });
+    document.addEventListener('upload-to-account', event => {
+        destinationAccount = event.detail;
+        const previousAccept = transactionInput.accept;
+        transactionInput.accept = '.csv,.txt';
+        transactionInput.addEventListener('change', () => {
+            transactionInput.accept = previousAccept;
+        });
+        transactionInput.click();
     });
 
     makeExample();

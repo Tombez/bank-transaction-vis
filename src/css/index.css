@@ -1,11 +1,14 @@
 [hidden] { display:none; }
 
 html {
-    --main-bg-color: #18191b;
+    --main-bg-color: #101010;
     --main-color: #cad2da;
     --drag-color: #423946;
-    --header-color: #111113;
+    --header-color: #050506;
     --main-gradient: radial-gradient(rgb(35, 35, 45), rgb(20, 20, 25));
+    --bank-bg: #202020;
+    --account-bg: #303030;
+    --tran-file-bg: #404040;
     --incomplete-color: orange;
     --complete-color: #00F300;
     scrollbar-color: var(--drag-color) var(--main-bg-color);
@@ -334,11 +337,14 @@ span[contenteditable="plaintext-only"]:focus {
     flex-direction: column;
 }
 .bank-container {
-    background: rgb(20, 20, 35);
+    background: var(--bank-bg);
     margin-top: 10px;
 }
 .account-container {
-    background: rgb(30, 20, 20);
+    background: var(--account-bg);
+}
+.transaction-file-container {
+    background: var(--tran-file-bg);
 }
 .transaction-file-container > .header:not(.fully-filled) .icon-edit,
 :not(.transaction-file-container) > .header:not(.fully-filled) .icon-expand {
@@ -455,6 +461,12 @@ span[contenteditable="plaintext-only"]:focus {
     white-space: nowrap; 
     width: 1px;
     margin: 0;
+}
+#bank-tab {
+    overflow-y: auto;
+}
+.csv-viewer tbody {
+    background: var(--bank-bg);
 }
 label[for="transaction-input"] {
     display: block;

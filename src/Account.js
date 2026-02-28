@@ -6,6 +6,7 @@ import {fromDateString, dateToYmd} from './date-utils.js';
 import {Range} from './utils.js';
 import {Filter} from './TransactionFile.js';
 import {Csv} from './Csv.js';
+import {Addable} from './Addable.js';
 
 const toCents = x => Math.round(x * 100) / 100;
 
@@ -44,7 +45,7 @@ const addBalInputs = (account, container, date = '', bal = '') => {
     account.orderBalancePointContainers();
 }
 
-export class Account extends Named {
+export class Account extends Addable(Named) {
     constructor(name) {
         super(name, {
             settingName: 'account',
@@ -121,6 +122,12 @@ export class Account extends Named {
 
         for (const tranFile of this.transactionFiles)
             this.content.node.appendChild(tranFile.node);
+    }
+    add() {
+        const detail = this;
+        const bubbles = true;
+        const event = new CustomEvent('upload-to-account', {detail, bubbles});
+        this.node.dispatchEvent(event);
     }
     addTransactionFile(tranFile) {
         this.transactionFiles.push(tranFile);
@@ -342,7 +349,7 @@ export class Account extends Named {
     static searchTranFileForAccountCol(tranFile) {
         if (!tranFile.csv.hasHeader) return -1;
         return tranFile.csv.headings.findIndex(({text}) =>
-        /^(account|goal)( name| number)?$/i.test(text));
+            /^(account|goal)( name| number)?$/i.test(text));
     }
     static searchTranFileForAccountNames(tranFile) {
         const csv = tranFile.csv;

@@ -58,9 +58,9 @@ export class CsvViewer extends LazyHtml {
         pageBar.innerHTML = `
         <button class="icon icon-left" aria-label="previous" title="previous"></button>
         <button class="icon page-btn page-first">1</button>
-        <div class="ellipsis page-first">..</div>
+        <div class="ellipsis page-first">…</div>
         <button class="icon page-btn page-selected">1</button>
-        <div class="ellipsis page-last">..</div>
+        <div class="ellipsis page-last">…</div>
         <button class="icon page-btn page-last">${this.pageCount}</button>
         <button class="icon icon-right" aria-label="next" title="next"></button>
         <div class="page-items"></div>

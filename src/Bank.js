@@ -3,24 +3,7 @@ import {capitalize} from './utils.js';
 import memoMixin from './memoMixin.js';
 import {makeDroppable} from './dragAndDrop.js';
 import {Account} from './Account.js';
-
-const Addable = memoMixin(Base => class extends Base {
-    constructor(...args) {
-        super(...args);
-    }
-    generateHtml() {
-        super.generateHtml();
-        const addBtn = document.createElement('button');
-        addBtn.className = 'icon icon-add';
-        addBtn.ariaLabel = addBtn.title = 'Add';
-        this.btnWrapper.appendChild(addBtn);
-        addBtn.addEventListener('click', event => {
-            this.add();
-            if (typeof this.expand == 'function') this.expand();
-        });
-    }
-    add() {}
-});
+import {Addable} from './Addable.js';
 
 export class Bank extends Addable(Named) {
     constructor(name) {
@@ -100,6 +83,7 @@ export class Bank extends Addable(Named) {
         for (let i = 1; this.accounts.find(a => a.name == name); ++i)
             name = 'Default Account ' + i;
         this.addAccount(new Account(name));
+        this.expand();
     }
     encode() {
         return {

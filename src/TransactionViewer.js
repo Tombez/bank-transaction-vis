@@ -1,10 +1,11 @@
-import {Csv} from './Csv.js';
+import {Csv, CSV_DATA_TYPES} from './Csv.js';
 import {CsvViewer} from './CsvViewer.js';
 import {dateToYmd} from './date-utils.js';
 
 export default class TransactionViewer extends CsvViewer {
     constructor(transactions) {
-        const csv = new Csv('Bank,Account,Date,Description,Amount,Category', true);
+        const csv = new Csv('Bank,Account,Date,Description,Amount,Category',
+            true);
         super(csv);
         this.transactions = transactions;
         this.filters = [];
@@ -16,7 +17,56 @@ export default class TransactionViewer extends CsvViewer {
 
         this.filtersNode = document.createElement('div');
         this.node.insertBefore(this.filtersNode, this.node.firstChild);
+
+        // Add column sort buttons
+        const ths = this.node.querySelectorAll('th');
+        for (let i = 0; i < ths.length; ++i) {
+            const th = ths[i];
+            const headingWrapper = document.createElement('div');
+            headingWrapper.className = 'heading-wrapper';
+            const sortBtnWrapper = document.createElement('div');
+            sortBtnWrapper.className = 'flex-col';
+            const btnUp = document.createElement('button');
+            btnUp.className = 'sort-arrow arrow-up';
+            const btnDown = document.createElement('button');
+            btnDown.className = 'sort-arrow arrow-down';
+            sortBtnWrapper.appendChild(btnUp);
+            sortBtnWrapper.appendChild(btnDown);
+            const headerTextWrapper = document.createElement('div');
+            headerTextWrapper.className = 'flex-col';
+            while (th.firstChild) headerTextWrapper.appendChild(th.firstChild);
+            headingWrapper.appendChild(headerTextWrapper);
+            headingWrapper.appendChild(sortBtnWrapper);
+            th.appendChild(headingWrapper);
+
+            btnUp.addEventListener('click', () => this.sortBy(i, true));
+            btnDown.addEventListener('click', () => this.sortBy(i, false));
+        }
+
         this.update();
+    }
+    sortBy(colIndex, ascending) {
+        const active = this.node.querySelector('.active');
+        if (active)
+            active.classList.remove('active');
+        const th = this.node.querySelectorAll('th')[colIndex];
+        const btn = th.querySelector(ascending ? '.arrow-up' : '.arrow-down');
+        btn.classList.add('active');
+        const heading = this.csv.headings[colIndex];
+        const isNumCol = heading.type == CSV_DATA_TYPES.NUMBER;
+        let callback;
+        if (isNumCol) {
+            const nonDigitRegex = /[^\d\.-]/g;
+            const toNumber = x => parseFloat(x.replace(nonDigitRegex, ''));
+            callback = (a, b) => (toNumber(a) - toNumber(b)) *
+                (ascending ? 1 : -1);
+        } else {
+            callback = (a, b) => (a < b ? -1 : a == b ? 0 : 1) *
+                (ascending ? 1 : -1);
+        }
+        this.csv.rows.sort((a, b) => callback(a[colIndex], b[colIndex]));
+        this.page = 0;
+        super.update();
     }
     getRows() {
         let filtered = this.transactions;

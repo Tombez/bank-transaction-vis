@@ -11,6 +11,8 @@ html {
     --tran-file-bg: #404040;
     --incomplete-color: orange;
     --complete-color: #00F300;
+    --arrow-left-svg: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="210 230 500 560"><path d="M577.706667 768a87.893333 87.893333 0 0 1-55.466667-19.626667l-217.6-179.626666a72.533333 72.533333 0 0 1 0-113.493334l217.6-179.626666a89.6 89.6 0 0 1 94.293333-11.093334 75.093333 75.093333 0 0 1 44.8 67.84v359.253334a75.093333 75.093333 0 0 1-44.8 67.84 95.146667 95.146667 0 0 1-38.826666 8.533333z"/></svg>');
+
     scrollbar-color: var(--drag-color) var(--main-bg-color);
     scrollbar-width: thin;
     color-scheme: dark;
@@ -112,8 +114,7 @@ table td {
     border-right: 1px solid var(--main-color);
     border-bottom: 1px solid var(--main-color);
 }
-    table th:first-child,
-    table td:first-child {
+table th:first-child, table td:first-child {
     border-left: 1px solid var(--main-color);
 }
 td, th {
@@ -134,6 +135,51 @@ td, th {
     color: #999;
     font-size: 0.6em;
     display: block;
+}
+/* .sort-wrapper {} */
+.transaction-viewer div:has(>.sort-arrow) {
+    justify-content: center;
+    margin-left: 3px;
+}
+.transaction-viewer div:has(>.arrow-up:focus-visible) {
+    border-top: 2px solid white;
+}
+.transaction-viewer div:has(>.arrow-down:focus-visible) {
+    border-bottom: 2px solid white;
+}
+.heading-wrapper {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+.sort-arrow {
+    width: 15px;
+    height: 15px;
+    border: 0;
+    background: #474747;
+    mask: var(--arrow-left-svg);
+    cursor: pointer;
+}
+.sort-arrow.active {
+    background: var(--main-color);
+}
+.sort-arrow:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 2px;
+}
+.arrow-up {
+    transform: rotate(90deg);
+}
+.arrow-down {
+    transform: rotate(-90deg);
+}
+.flex-row {
+    display: flex;
+    flex-direction: row;
+}
+.flex-col {
+    display: flex;
+    flex-direction: column;
 }
 .sticky-header {
     position: sticky;

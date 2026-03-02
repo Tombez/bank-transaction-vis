@@ -27,8 +27,7 @@ const NamedMixin = memoMixin(Base => class extends LazyHtmlMixin(Base) {
         super.generateHtml();
         this.node.classList.add('named');
         this.header = document.createElement('div');
-        this.header.className = 'header flash-highlight';
-        setTimeout(() => this.header.classList.remove('flash-highlight'), 1e3);
+        this.header.className = 'header';
 
         this.title = document.createElement(this.titleType);
         this.title.className = this.titleClass;

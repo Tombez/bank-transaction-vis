@@ -1,7 +1,7 @@
 import {hsl} from "../color-utils.js";
 import {Graph} from './Graph.js';
 
-export default class HierarchyGraph extends Graph {
+export default class HierarchalPieGraph extends Graph {
     constructor(root, title, size) {
         super(title, null, null, size);
         this.root = root;
@@ -40,15 +40,19 @@ export default class HierarchyGraph extends Graph {
         //     this.calculatePieces(root.children, root.total, -0.5*Math.PI, 1.5*Math.PI, innerRadius, radius);
         // }
 
-        // Find closest text to pointer
-        const [minText, minDist] = this.texts.reduce(([minText, min], text) => {
-            const tx = text.drawLoc.x;
-            const ty = text.drawLoc.y;
+        if (event.button == 1) {
+            // Find closest text to pointer
+            const [minText, minDist] = this.texts.reduce(([minText, min], text) => {
+                const tx = text.drawLoc.x;
+                const ty = text.drawLoc.y;
 
-            const distSq = (x - tx) ** 2 + (y - ty) ** 2;
-            return distSq < min ? [text, distSq] : [minText, min];
-        }, [null, Infinity]);
-        if (minDist < 20 ** 2) this.dragging = minText;
+                const distSq = (x - tx) ** 2 + (y - ty) ** 2;
+                return distSq < min ? [text, distSq] : [minText, min];
+            }, [null, Infinity]);
+            if (minDist < 20 ** 2) this.dragging = minText;
+        } else if (event.button == 2) {
+
+        }
     }
     pointerup(event) {
         super.pointerup(event);
@@ -64,10 +68,10 @@ export default class HierarchyGraph extends Graph {
     }
     contextmenu(event) {
         console.debug('context menu, dragging: ', !!this.dragging);
-        if (this.dragging) {
-            event.preventDefault();
-            event.stopPropagation();
-        }
+        // if (this.dragging) {
+        //     event.preventDefault();
+        //     event.stopPropagation();
+        // }
     }
     textCollisions() {
         for (let i = 0; i < this.texts.length; ++i) {
@@ -89,6 +93,13 @@ export default class HierarchyGraph extends Graph {
             }
         }
     }
+    getMouseSector() {
+        const pointer = this.radialPointer;
+        let mAngle = Math.atan2(pointer.y, pointer.x);
+        if (mAngle < 0) mAngle += 2*Math.PI;
+        const mRadius = Math.hypot(pointer.x, pointer.y);
+        return this.whichSector(mAngle, mRadius, this.root.children);
+    }
     whichSector(angle, radius, sectors) { // recursive
         if (!sectors) return null;
         for (const sector of sectors) {
@@ -102,10 +113,7 @@ export default class HierarchyGraph extends Graph {
     }
     checkHover(pieces) {
         const pointer = this.radialPointer;
-        let mAngle = Math.atan2(pointer.y, pointer.x);
-        if (mAngle < 0) mAngle += 2*Math.PI;
-        const mRadius = Math.hypot(pointer.x, pointer.y);
-        let hoverSector = this.whichSector(mAngle, mRadius, this.root.children);
+        let hoverSector = this.getMouseSector();
         if (!hoverSector) {
             this.hoverBox = null;
             return;
@@ -259,7 +267,6 @@ export default class HierarchyGraph extends Graph {
             let drawAngle = (midAngle + Math.PI*2) % (Math.PI*2);
             if (drawAngle > 0.5*Math.PI && drawAngle < 1.5*Math.PI)
                 drawAngle += Math.PI;
-            let ctx = document.createElement("canvas").getContext("2d");
             this.texts.push({
                 text: cur.name,
                 home: {x: textX, y: textY},

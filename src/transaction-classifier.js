@@ -1,4 +1,4 @@
-import HierarchalPieGraph from "./graphs/HierarchalPieGraph.js";
+import {SpendingHPieGraph} from "./graphs/SpendingHPieGraph.js";
 import FlowGraph from "./graphs/FlowGraph.js";
 import {Csv} from "./Csv.js";
 import {dateToYmd} from "./date-utils.js";
@@ -514,7 +514,7 @@ const labelTransactions = transactions => {
 };
 
 const makeHPieGraph = (root, title) => {
-    let graph = new HierarchalPieGraph(root, title, canvasSize);
+    let graph = new SpendingHPieGraph(root, title, canvasSize);
     console.debug(title + " root:", graph.root);
     return graph;
 };

@@ -94,9 +94,9 @@ export class CsvViewer extends LazyHtml {
         lastPage.innerText = this.pageCount;
 
         for (const node of [...this.node.querySelectorAll('.page-first')])
-            node.style.display = number == 0 ? 'none' : '';
+            node.style.visibility = number == 0 ? 'hidden' : 'visible';
         for (const node of [...this.node.querySelectorAll('.page-last')])
-            node.style.display = this.pageCount == 0 || number == this.pageCount - 1 ? 'none' : '';
+            node.style.visibility = this.pageCount == 0 || number == this.pageCount - 1 ? 'hidden' : 'visible';
 
         const startIndex = number * this.itemsPerPage;
         let endIndex = startIndex + this.itemsPerPage;

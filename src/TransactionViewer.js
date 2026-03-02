@@ -4,7 +4,7 @@ import {dateToYmd} from './date-utils.js';
 
 export default class TransactionViewer extends CsvViewer {
     constructor(transactions) {
-        const csv = new Csv('Bank,Account,Date,Description,Amount', true);
+        const csv = new Csv('Bank,Account,Date,Description,Amount,Category', true);
         super(csv);
         this.transactions = transactions;
         this.filters = [];
@@ -22,11 +22,16 @@ export default class TransactionViewer extends CsvViewer {
         let filtered = this.transactions;
         for (const {test} of this.filters)
             filtered = filtered.filter(test);
+        const numberFormat = new Intl.NumberFormat('en-US', {
+            style: 'currency', currency: 'USD' });
         const rows = filtered.map(t => {
             const account = t.transactionFile.account;
             const bank = account.bank;
             const dateStr = dateToYmd(t.date);
-            return [bank.name, account.name, dateStr, t.desc, t.amount];
+            const amount = numberFormat.format(t.amount);
+            const category = t.labels?.join('/') || 'Uncategorized';
+            return [bank.name, account.name, dateStr, t.desc, amount,
+                category];
         });
         return rows;
     }

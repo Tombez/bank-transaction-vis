@@ -4,6 +4,7 @@ import {dateToYmd} from '../date-utils.js';
 import Vec2 from '../Vec2.js';
 import {Filter} from '../TransactionFile.js';
 import {Settings} from '../Settings.js';
+import {Account} from '../Account.js';
 
 const toCents = x => Math.round(x * 100) / 100;
 
@@ -40,44 +41,6 @@ const createBalLine = (transactions, balancePoints) => {
     }
     return line;
 };
-const combineBalLines = (lineA, lineB) => {
-    if (!lineA.length) return lineB;
-    if (!lineB.length) return lineA;
-    if (lineB[0].x < lineA[0].x) [lineA, lineB] = [lineB, lineA];
-    let indexA = 0, indexB = 0, lineC = [];
-    const balA = lineA[0].y, balB = lineB[0].y;
-    let balC = balA;
-    if (lineB[0].x == lineA[0].x) balC += balB;
-    const pushPoints = (start, end) => {
-        const change = end.y - start.y;
-        start.y = balC;
-        end.y = (balC += change);
-        lineC.push(start, end);
-    };
-    for (; indexA < lineA.length; indexA += 2) {
-        const startA = lineA[indexA].clone();
-        const endA = lineA[indexA + 1].clone();
-        let startB;
-        for (; indexB < lineB.length; indexB += 2) {
-            startB = lineB[indexB].clone();
-            if (startB.x >= startA.x) break;
-            const endB = lineB[indexB + 1].clone();
-            pushPoints(startB, endB);
-        }
-        if (startB && startB.x == startA.x) {
-            const changeB = lineB[indexB + 1].y - startB.y;
-            endA.y += changeB;
-            indexB += 2;
-        }
-        pushPoints(startA, endA);
-    }
-    for (; indexB < lineB.length; indexB += 2) {
-        const startB = lineB[indexB].clone();
-        const endB = lineB[indexB + 1].clone();
-        pushPoints(startB, endB);
-    }
-    return lineC;
-};
 
 export default class AccountBalancesGraph extends ViewLineGraph {
     constructor(accounts, dataRangeX, dataRangeY) {
@@ -98,12 +61,13 @@ export default class AccountBalancesGraph extends ViewLineGraph {
     }
     update() {
         if (!this.settings) return;
-        const removeSweep = a => a.type == 'Brokerage' ?
-            a.transactions.filter(t => !/\bsweep\b/i.test(t.desc)) :
-            a.transactions;
+        const removeSweep = a =>
+            a.transactions//.filter(t => !/\bsweep\b/i.test(t.desc));
         let values = this.accounts.map(a => {
-            let transactions = removeSweep(a);
-            return a.balLine = createBalLine(transactions, a.balancePoints);
+            if (a.type == 'Brokerage') {
+                let transactions = removeSweep(a);
+                return createBalLine(transactions, a.balancePoints);
+            } else return a.balLine;
         });
         let labels;
         if (this.settings.get('groupByType')) {
@@ -113,7 +77,7 @@ export default class AccountBalancesGraph extends ViewLineGraph {
                 const type = account.type || 'Unset';
                 let balLine = typeMap.get(type);
                 balLine = balLine ?
-                    balLine = combineBalLines(balLine, account.balLine) :
+                    balLine = Account.combineBalLines(balLine, account.balLine) :
                     account.balLine;
                 typeMap.set(type, balLine);
             }

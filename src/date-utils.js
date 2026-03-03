@@ -63,12 +63,13 @@ export const padYearMdy = (mdy, millenium = "20") => {
     return `${m}${separator}${d}${separator}${y}`;
 };
 export const nowString = () => {
-    const now = new Date();
-    const millis = now % MS_DAY;
+    const nowDate = new Date();
+    const millis = nowDate.getTime() % MS_DAY;
     return dateValToMdy(now, "-") + "-" + millis;
 };
 export const getWeek = (date) => {
-    if (typeof(date) == 'number') date = new Date(date);
+    if (typeof date == 'number') date = new Date(date);
     const day = date.getDate() - date.getDay();
-    return new Date(date.getFullYear(), date.getMonth(), day) / MS_WEEK | 0;
+    const weekBegin = new Date(date.getFullYear(), date.getMonth(), day);
+    return weekBegin.getTime() / MS_WEEK | 0;
 };

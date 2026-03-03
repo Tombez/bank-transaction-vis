@@ -9,6 +9,7 @@ export default class TransactionViewer extends CsvViewer {
         super(csv);
         this.transactions = transactions;
         this.filters = [];
+        this.sort = {colIndex: 2, ascending: false};
         this.update();
     }
     generateHtml() {
@@ -28,8 +29,12 @@ export default class TransactionViewer extends CsvViewer {
             sortBtnWrapper.className = 'flex-col';
             const btnUp = document.createElement('button');
             btnUp.className = 'sort-arrow arrow-up';
+            btnUp.title = 'Sort Column Ascending';
+            btnUp.setAttribute('aria-label', btnUp.title);
             const btnDown = document.createElement('button');
             btnDown.className = 'sort-arrow arrow-down';
+            btnDown.title = 'Sort Column Descending';
+            btnDown.setAttribute('aria-label', btnDown.title);
             sortBtnWrapper.appendChild(btnUp);
             sortBtnWrapper.appendChild(btnDown);
             const headerTextWrapper = document.createElement('div');
@@ -45,24 +50,26 @@ export default class TransactionViewer extends CsvViewer {
 
         this.update();
     }
-    sortBy(colIndex, ascending) {
-        const active = this.node.querySelector('.active');
-        if (active)
-            active.classList.remove('active');
-        const th = this.node.querySelectorAll('th')[colIndex];
-        const btn = th.querySelector(ascending ? '.arrow-up' : '.arrow-down');
-        btn.classList.add('active');
+    sortBy(colIndex = this.sort.colIndex, ascending = this.sort.ascending) {
+        this.sort.colIndex = colIndex;
+        this.sort.ascending = ascending;
+        if (this.hasNode) {
+            const active = this.node.querySelector('.active');
+            if (active) active.classList.remove('active');
+            const th = this.node.querySelectorAll('th')[colIndex];
+            const btn = th.querySelector(ascending ? '.arrow-up' : '.arrow-down');
+            if (btn) btn.classList.add('active');
+        }
         const heading = this.csv.headings[colIndex];
         const isNumCol = heading.type == CSV_DATA_TYPES.NUMBER;
+        const direction = ascending ? 1 : -1;
         let callback;
         if (isNumCol) {
             const nonDigitRegex = /[^\d\.-]/g;
             const toNumber = x => parseFloat(x.replace(nonDigitRegex, ''));
-            callback = (a, b) => (toNumber(a) - toNumber(b)) *
-                (ascending ? 1 : -1);
+            callback = (a, b) => (toNumber(a) - toNumber(b)) * direction;
         } else {
-            callback = (a, b) => (a < b ? -1 : a == b ? 0 : 1) *
-                (ascending ? 1 : -1);
+            callback = (a, b) => (a < b ? -1 : a == b ? 0 : 1) * direction;
         }
         this.csv.rows.sort((a, b) => callback(a[colIndex], b[colIndex]));
         this.page = 0;
@@ -93,7 +100,7 @@ export default class TransactionViewer extends CsvViewer {
             for (const {label} of this.filters)
                 this.filtersNode.innerHTML += `<div class="filter">${label}</div>`;
         }
-        super.update();
+        this.sortBy();
     }
 }
 const updateOptions = (transactions, filterTransactions, minDateT, maxDateT) => {

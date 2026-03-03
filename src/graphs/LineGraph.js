@@ -134,7 +134,9 @@ export class LineGraph extends Graph {
                     ctx.globalAlpha = 1;
                     ctx.translate(-5, drawY);
                     ctx.scale(1, -1);
-                    ctx.fillText(`$${toCents(y)}`, 0, 0);
+                    const isNeg = y < 0;
+                    const val = Math.abs(toCents(y));
+                    ctx.fillText(`${isNeg ? '-' : ''}$${val}`, 0, 0);
                 });
             }
             

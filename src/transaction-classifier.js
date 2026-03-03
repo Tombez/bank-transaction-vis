@@ -1,7 +1,7 @@
 import {SpendingHPieGraph} from "./graphs/SpendingHPieGraph.js";
 import FlowGraph from "./graphs/FlowGraph.js";
 import {Csv} from "./Csv.js";
-import {dateToYmd} from "./date-utils.js";
+import {dateToYmd, MS_DAY} from "./date-utils.js";
 import BarGraph from "./graphs/BarGraph.js";
 import {ViewLineGraph} from "./graphs/ViewLineGraph.js";
 import AccountBalancesGraph from './graphs/AccountBalancesGraph.js';
@@ -22,7 +22,8 @@ let addBankBtn;
 let exportBtn;
 let classifiers = [];
 let bankList = window.bankList = [];
-let banksRoot = {children: bankList, hasNode: true, content: {hasNode: true}};
+let banksRoot = {children: bankList, hasNode: true, content: {hasNode: true},
+    __proto__: Bank.prototype};
 let transactionTab = null;
 let compileCounter = 0;
 let tViewer;
@@ -238,7 +239,6 @@ const compileTransactions = () => {
 };
 const compileTransactionsDebounced = () => {
     console.debug('compile', compileCounter++);
-    banksRoot.__proto__ = Bank.prototype;
     banksRoot.compile();
     let transactions = banksRoot.transactions;
     transactions.sort((a, b) => a.timestamp - b.timestamp);
@@ -249,8 +249,6 @@ const compileTransactionsDebounced = () => {
     
     const accounts = bankList.map(bank => bank.accounts).flat();
     if (!accounts.length) return;
-
-    calculateDailyBalances(accounts);
     
     const accountsWithTs = accounts.filter(a => a.transactions.length);
     if (!accountsWithTs.length) return;
@@ -318,85 +316,27 @@ const loadTransactions = (transactions) => {
     
     // updateOptions(transactions, filterTransactions, minDateT, maxDateT);
 };
-const calculateDailyBalances = (accounts) => {
-    for (const account of accounts) {
-        if (!account.transactions.length) continue;
-        const dailyChange = account.dailyChange = new Map();
-        for (const t of account.transactions) {
-            let bal = dailyChange.get(t.timestamp) || 0;
-            dailyChange.set(t.timestamp, bal + t.amount);
-        }
-
-        const dailyChangeEntries = Array.from(dailyChange.entries());
-        const stamp = account.stampRange;
-        let dailyBalance = account.dailyBalance = [];
-        Date.msDay = 1000 * 60 * 60 * 24;
-        let i = 0;
-        let prevBal = 0;
-        dailyChangeEntries.sort(([stampA], [stampB]) => stampA - stampB);
-        for (const [curStamp, change] of dailyChangeEntries) {
-            let stampI = Math.round((curStamp - stamp.min) / Date.msDay);
-            for (; i < stampI; ++i) dailyBalance[i] = prevBal;
-            dailyBalance[stampI] = prevBal += change;
-        }
-        const balRange = account.balRange = Range.fromValues(dailyBalance);
-        if (!account.name.includes("Credit") && balRange.min < 0) {
-            for (let i = 0; i < dailyBalance.length; ++i)
-                dailyBalance[i] -= balRange.min;
-            balRange.max -= balRange.min;
-            balRange.min -= balRange.min;
-        }
-    }
-};
 const makeBalancesGraph = (accounts, stampRange, balRange) => {
     const graph = new AccountBalancesGraph(accounts, stampRange, balRange);
     return graph;
 };
 const makeNetWorthGraph = (accounts, stampRange, balRange) => {
-    const totalDailyBalance = [];
-    for (let d = stampRange.min, i = 0; d < stampRange.max; d += Date.msDay, ++i) {
-        let total = 0;
-        for (const account of accounts.values()) {
-            if (account.stampRange.min <= d) {
-                let index = Math.round((d - account.stampRange.min) / Date.msDay);
-                if (d > account.stampRange.max)
-                    index = account.dailyBalance.length - 1;
-                total += account.dailyBalance[index];
-            }
-        }
-        totalDailyBalance[i] = total;
-    }
-
-    let dataPoints = [];
-    const labels = [];
-    let prevYear = -Infinity;
-    for (let i = 0, len = totalDailyBalance.length; i < len; ++i) {
-        const bal = totalDailyBalance[i];
-        const stamp = stampRange.min + i * Date.msDay;
-        const date = new Date(stamp);
-        const year = +date.getFullYear();
-        let label = "";
-        const isFirstOrLast = prevYear == -Infinity || i + 1 == len;
-        if (year > prevYear || isFirstOrLast) {
-            prevYear = year;
-            label = isFirstOrLast ? dateToYmd(date) : date.getFullYear();
-        }
-        labels.push(label);
-
-        const x = (stamp - stampRange.min) / stampRange.diff;
-        const y = (bal - balRange.min) / balRange.diff;
-        dataPoints.push({x, y});
+    let totalBalance = [];
+    for (const account of accounts) {
+        totalBalance = Account.combineBalLines(totalBalance, account.balLine);
     }
 
     const size = {x: canvasSize.x, y: 400};
-    let netWorthGraph = new BarGraph("Net Worth Over Time", totalDailyBalance, labels, size);
+    // title, values, labels, size, dataRangeX, dataRangeY
+    let netWorthGraph = new ViewLineGraph('Net Worth Over Time', [totalBalance],
+        ['Net Worth'], size, stampRange, balRange);
     window.netWorthGraph = netWorthGraph;
     return netWorthGraph;
 };
 const updateActivityGraphs = () => {
     const banks = bankList;
     const range = activityRange;
-    const dayCount = Math.round(range.diff / Date.msDay) + 1;
+    const dayCount = Math.round(range.diff / MS_DAY) + 1;
 
     for (const bank of banks) {
         let bankSum = new BitArray(dayCount);

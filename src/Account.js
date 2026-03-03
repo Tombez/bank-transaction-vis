@@ -7,6 +7,7 @@ import {Range} from './utils.js';
 import {Filter} from './TransactionFile.js';
 import {Csv} from './Csv.js';
 import {Addable} from './Addable.js';
+import Vec2 from './Vec2.js';
 
 const toCents = x => Math.round(x * 100) / 100;
 
@@ -45,11 +46,18 @@ const addBalInputs = (account, container, date = '', bal = '') => {
     account.orderBalancePointContainers();
 }
 
+export class HeaderFormat {
+    constructor(key, settings = new Map()) {
+        this.key = key;
+        this.settings = settings;
+    }
+}
+
 export class Account extends Addable(Named) {
     constructor(name) {
         super(name, {
             settingName: 'account',
-            icon: '🧾', 
+            icon: '🧾',
             titleType: 'h3',
             titleClass: 'acc-title',
         });
@@ -185,39 +193,49 @@ export class Account extends Addable(Named) {
             .concat(this.manualBalPoints || []);
         this.balancePoints.sort((a, b) => a.timestamp - b.timestamp);
         this.displayHeaderFormats();
-        this.checkBalancePointContinuity();
+        this.createBalLine();
+        const balances = this.balLine[Symbol.iterator]().map(p => p.y);
+        this.balRange = Range.fromValues(balances);
     }
     orderBalancePointContainers() {
         const containers = Array.from(this.settings.node
             .querySelectorAll('.balance-point-container'));
         const today = dateToYmd(new Date());
-        const getStamp = row => +fromDateString(row
-            .querySelector('input[type="date"]').value || today);
+        const getStamp = row => fromDateString(row
+            .querySelector('input[type="date"]').value || today).getTime();
         containers.sort((a, b) => getStamp(a) - getStamp(b));
         for (let i = 0; i < containers.length; ++i)
             containers[i].style.order = i;
     }
-    checkBalancePointContinuity() {
-        if (!this.balancePoints.length) return;
+    createBalLine() {
         let bal = 0;
-        const transactions = this.transactions.slice()
+        const transactions = this.transactions
             .sort((a, b) => a.timestamp - b.timestamp);
         let transIndex = 0;
         const sumUntil = timestamp => {
             while (transIndex < transactions.length &&
                 transactions[transIndex].timestamp <= timestamp)
-                    bal += transactions[transIndex++].amount;
+            {
+                const curStamp = transactions[transIndex].timestamp;
+                line.push(new Vec2(curStamp, bal));
+                while(transIndex < transactions.length &&
+                    transactions[transIndex].timestamp == curStamp)
+                        bal = toCents(bal + transactions[transIndex++].amount);
+                line.push(new Vec2(curStamp, bal));
+            }
         };
+        const bank = this.bank.name;
+        const account = this.name;
+        let line = this.balLine = [];
         this.balanceDiscrepancies = [];
         let startingBal;
         for (let i = 0; i < this.balancePoints.length; i++) {
             const balPoint = this.balancePoints[i];
             sumUntil(balPoint.timestamp);
             const diff = toCents(bal - balPoint.balance);
-            const bank = this.bank.name;
-            const account = this.name;
             if (i == 0) {
                 startingBal = -diff;
+                for (const p of line) p.y = toCents(p.y - diff);
                 console.debug(bank, account, 'intial balance of', startingBal);
             } else if (diff != 0) {
                 const str = 'found balance difference of';
@@ -232,7 +250,9 @@ export class Account extends Addable(Named) {
                 });
             }
             bal = balPoint.balance;
+            line[line.length - 1].y = bal;
         }
+        sumUntil(Infinity);
         this.startingBal = startingBal;
 
         this.displayDiscrepancies();
@@ -364,6 +384,44 @@ export class Account extends Addable(Named) {
             }
         }
         return Array.from(accountNames.values());
+    }
+    static combineBalLines(lineA, lineB) {
+        if (!lineA.length) return lineB;
+        if (!lineB.length) return lineA;
+        if (lineB[0].x < lineA[0].x) [lineA, lineB] = [lineB, lineA];
+        let indexA = 0, indexB = 0, lineC = [];
+        const balA = lineA[0].y, balB = lineB[0].y;
+        let balC = balA;
+        if (lineB[0].x == lineA[0].x) balC += balB;
+        const pushPoints = (start, end) => {
+            const change = end.y - start.y;
+            start.y = balC;
+            end.y = (balC += change);
+            lineC.push(start, end);
+        };
+        for (; indexA < lineA.length; indexA += 2) {
+            const startA = lineA[indexA].clone();
+            const endA = lineA[indexA + 1].clone();
+            let startB;
+            for (; indexB < lineB.length; indexB += 2) {
+                startB = lineB[indexB].clone();
+                if (startB.x >= startA.x) break;
+                const endB = lineB[indexB + 1].clone();
+                pushPoints(startB, endB);
+            }
+            if (startB && startB.x == startA.x) {
+                const changeB = lineB[indexB + 1].y - startB.y;
+                endA.y += changeB;
+                indexB += 2;
+            }
+            pushPoints(startA, endA);
+        }
+        for (; indexB < lineB.length; indexB += 2) {
+            const startB = lineB[indexB].clone();
+            const endB = lineB[indexB + 1].clone();
+            pushPoints(startB, endB);
+        }
+        return lineC;
     }
 }
 

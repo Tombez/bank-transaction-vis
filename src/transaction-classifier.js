@@ -13,6 +13,7 @@ import {BankRoot} from './Named.js';
 import {TabBar} from './TabBar.js';
 import TransactionViewer from './TransactionViewer.js';
 import {Range, best, BitArray, debounceFunc} from './utils.js';
+import {Classifier, ClassifierViewer} from './ClassifierViewer.js';
 
 const COMPILE_COOLDOWN = 50;
 const canvasSize = {x: 800, y: 800};
@@ -26,6 +27,7 @@ let bankList = window.bankList = [];
 let banksRoot = new BankRoot('Banks Root', {});
 banksRoot.children = bankList;
 let transactionTab = null;
+let classifierViewer = null;
 let compileCounter = 0;
 let tViewer;
 let activityRange;
@@ -128,7 +130,7 @@ const serializeClassifiers = (classifiers) => {
     let categories = new Map();
     for (const {type, unique, label} of classifiers) {
         let context = categories;
-        const labels = label.split('/')
+        const labels = label.split('/');
         for (let i = 0; i < labels.length; ++i) {
             const category = labels[i];
             let categoryObj = context.get(category);
@@ -384,13 +386,7 @@ const labelTransactions = transactions => {
         desc = desc.toLowerCase();
 
         let [label, classifier] = labelTransaction(date, desc, amount);
-        if (!label) {
-            label = 'Uncategorized';
-            // let elm = document.createElement("pre");
-            // elm.textContent = transaction.row.join(",");
-            // unlabeledDiv.appendChild(elm);
-            // unlabeledDiv.style.display = "block";
-        }
+        if (!label) label = 'Uncategorized';
         if (!classifier.transactions) classifier.transactions = [];
         classifier.transactions.push(transaction);
         transaction.classifier = classifier;
@@ -517,37 +513,18 @@ const fillLayers = (root, layers, index = 0) => { // recursive
 
 const labelTransaction = (date, desc, amount) => {
     for (const classifier of classifiers) {
-        let label = classifier(date, desc, amount);
+        let label = classifier.classify(date, desc, amount);
         if (label) return [label, classifier];
     }
-    return ["", ()=>{}];
+    return ['', ()=>{}];
 };
 
 const addClassifier = (type, uniques, label) => {
     if (!Array.isArray(uniques)) uniques = [uniques];
     for (const unique of uniques) {
-        let classifier = switchClassifier(type, unique, label);
-        classifier.type = type;
-        classifier.unique = unique.toString();
-        classifier.label = label;
-        classifiers.push(classifier);
+        const classifier = new Classifier(type, unique, label);
+        classifierViewer.add(classifier);
     }
-};
-const switchClassifier = (type, unique, label) => {
-    switch(type) {
-        case "exact":
-            return (date,desc,amount) => desc == unique && label;
-        case "starts":
-            return (date,desc,amount) => desc.startsWith(unique) && label;
-        case "has":
-            return (date,desc,amount) => desc.includes(unique) && label;
-        case "custom":
-            return (date,desc,amount) => unique(date,desc,amount) && label;
-        case "custom-return":
-            return unique;
-        default:
-            throw new TypeError(`Unknown rule type "${type}"`);
-    };
 };
 
 const makeExample = () => {
@@ -625,6 +602,10 @@ const afterPageLoad = event => {
     const transactionElm = document.querySelector('#transactions');
     transactionTab = tabBar.addTab('Transactions', transactionElm);
     createTViewer();
+
+    classifierViewer = new ClassifierViewer(classifiers);
+    let classifierTab = tabBar.addTab('Classifiers', classifierViewer.node);
+    document.body.appendChild(classifierViewer.node);
 
     textInp = document.querySelector("#transaction-input");
     unlabeledDiv = document.querySelector("#unlabeled");

@@ -16,7 +16,6 @@ const NamedMixin = memoMixin(Base => class extends LazyHtmlMixin(Base) {
 
         this.settings = new Settings();
         this.content = new LazyHtml();
-        this.content.className = 'content';
         this.content.onGenerate = () => this.generateContentHtml();
         
         this.name = name;
@@ -52,6 +51,7 @@ const NamedMixin = memoMixin(Base => class extends LazyHtmlMixin(Base) {
         this.node.appendChild(this.activityGraph.node);
     }
     generateContentHtml() {
+        this.content.node.classList.add('content');
         this.content.node.appendChild(this.settings.node);
         this.settings.node.hidden = true;
         this.node.appendChild(this.content.node);

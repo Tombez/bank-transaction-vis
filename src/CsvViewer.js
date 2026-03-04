@@ -26,7 +26,7 @@ export class CsvViewer extends LazyHtml {
     }
     generateHtml() {
         super.generateHtml();
-        this.node.className = 'csv-viewer';
+        this.node.classList.add('csv-viewer');
 
         const tableWrapper = document.createElement('div');
         tableWrapper.className = 'table-content-wrapper';
@@ -56,13 +56,13 @@ export class CsvViewer extends LazyHtml {
         const pageBar = document.createElement('div');
         pageBar.className = 'page-bar btn-wrapper';
         pageBar.innerHTML = `
-        <button class="icon icon-left" aria-label="previous" title="previous"></button>
+        <button class="icon icon-left" aria-label="Previous" title="Previous"></button>
         <button class="icon page-btn page-first">1</button>
         <div class="ellipsis page-first">…</div>
         <button class="icon page-btn page-selected">1</button>
         <div class="ellipsis page-last">…</div>
         <button class="icon page-btn page-last">${this.pageCount}</button>
-        <button class="icon icon-right" aria-label="next" title="next"></button>
+        <button class="icon icon-right" aria-label="Next" title="Next"></button>
         <div class="page-items"></div>
         `;
         this.node.appendChild(pageBar);

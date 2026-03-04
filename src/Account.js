@@ -251,9 +251,6 @@ export class Account extends Addable(Named) {
                 for (const p of line) p.y = toCents(p.y - diff);
                 console.debug(bank, account, 'intial balance of', startingBal);
             } else if (diff != 0) {
-                const str = 'found balance difference of';
-                const dateStr = dateToYmd(new Date(balPoint.timestamp));
-                console.debug(str, diff, `${bank} ${account}`, dateStr);
                 const prevPoint = this.balancePoints[i - 1];
                 this.balanceDiscrepancies.push({
                     period: new Range(prevPoint.timestamp, balPoint.timestamp),

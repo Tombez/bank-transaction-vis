@@ -59,6 +59,7 @@ const NamedMixin = memoMixin(Base => class extends LazyHtmlMixin(Base) {
     }
     onEdit() {
         this.nameSpan.setAttribute('contenteditable', 'plaintext-only');
+        this.nameSpan.focus();
     }
     doneEditing() {
         this.nameSpan.setAttribute('contenteditable', false);
@@ -202,3 +203,5 @@ const Editable = memoMixin(Base => class extends Base {
 });
 
 export const Named = Editable(Collapsable(Deletable(NamedMixin())));
+
+export class BankRoot extends Named {}

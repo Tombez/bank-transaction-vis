@@ -5,7 +5,7 @@ import {dateToYmd} from './date-utils.js';
 export default class TransactionViewer extends CsvViewer {
     constructor(transactions) {
         const csv = new Csv('Bank,Account,Date,Description,Amount,Category',
-            true);
+            /* has header */ true);
         super(csv);
         this.transactions = transactions;
         this.filters = [];
@@ -30,11 +30,11 @@ export default class TransactionViewer extends CsvViewer {
             const btnUp = document.createElement('button');
             btnUp.className = 'sort-arrow arrow-up';
             btnUp.title = 'Sort Column Ascending';
-            btnUp.setAttribute('aria-label', btnUp.title);
+            btnUp.ariaLabel = btnUp.title;
             const btnDown = document.createElement('button');
             btnDown.className = 'sort-arrow arrow-down';
             btnDown.title = 'Sort Column Descending';
-            btnDown.setAttribute('aria-label', btnDown.title);
+            btnDown.ariaLabel = btnDown.title;
             sortBtnWrapper.appendChild(btnUp);
             sortBtnWrapper.appendChild(btnDown);
             const headerTextWrapper = document.createElement('div');
@@ -101,6 +101,7 @@ export default class TransactionViewer extends CsvViewer {
                 this.filtersNode.innerHTML += `<div class="filter">${label}</div>`;
         }
         this.sortBy();
+        this.updateHeaderTypes();
     }
 }
 const updateOptions = (transactions, filterTransactions, minDateT, maxDateT) => {

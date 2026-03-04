@@ -254,7 +254,8 @@ class OptionPanel {
     }
     pointerdown(event) {
         this.setPointer(event);
-        if (event.target.tagName.toLowerCase() != 'input' && event.which == 1) {
+        const PRIMARY = 0;
+        if (event.target.tagName.toLowerCase() != 'input' && event.button == PRIMARY) {
             event.preventDefault();
             document.activeElement.blur();
             this.pointermove(event);
@@ -267,7 +268,8 @@ class OptionPanel {
     }
     pointerup(event) {
         this.setPointer(event);
-        if (event.which == 1 && this.moveInterval) {
+        const PRIMARY = 0;
+        if (event.button == PRIMARY && this.moveInterval) {
             window.removeEventListener('pointermove', this.pointermove);
             clearInterval(this.moveInterval);
             this.moveInterval = null;

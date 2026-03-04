@@ -65,7 +65,7 @@ export const padYearMdy = (mdy, millenium = "20") => {
 export const nowString = () => {
     const nowDate = new Date();
     const millis = nowDate.getTime() % MS_DAY;
-    return dateValToMdy(now, "-") + "-" + millis;
+    return dateValToMdy(nowDate, '-') + '-' + millis;
 };
 export const getWeek = (date) => {
     if (typeof date == 'number') date = new Date(date);

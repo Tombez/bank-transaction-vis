@@ -8,6 +8,7 @@ import {Filter} from './TransactionFile.js';
 import {Csv} from './Csv.js';
 import {Addable} from './Addable.js';
 import Vec2 from './Vec2.js';
+import {LazyHtml} from './LazyHtml.js';
 
 const toCents = x => Math.round(x * 100) / 100;
 
@@ -46,10 +47,18 @@ const addBalInputs = (account, container, date = '', bal = '') => {
     account.orderBalancePointContainers();
 }
 
-export class HeaderFormat {
+export class HeaderFormat extends LazyHtml {
     constructor(key, settings = new Map()) {
+        super();
         this.key = key;
         this.settings = settings;
+        this.files = [];
+    }
+    generateHtml() {
+        super.generateHtml();
+        const plural = this.files.length > 1 ? 's' : '';
+        const fileCount = this.files.length;
+        this.node.textContent = `${fileCount} file${plural}: ` + this.key;
     }
 }
 
@@ -144,9 +153,12 @@ export class Account extends Addable(Named) {
         if (tranFile.csv.hasHeader) {
             const header = tranFile.csv.headings.map(h =>
                 Csv.escapeValue(h.text)).join();
-            let headerList = this.headerFormats.get(header);
-            if (!headerList) this.headerFormats.set(header, headerList = []);
-            headerList.push(tranFile);
+            let headerFormat = this.headerFormats.get(header);
+            if (!headerFormat) {
+                headerFormat = new HeaderFormat(header, tranFile.settings);
+                this.headerFormats.set(header, headerFormat);
+            }
+            headerFormat.files.push(tranFile);
         }
         this.changed();
     }
@@ -159,9 +171,10 @@ export class Account extends Addable(Named) {
         if (tranFile.csv.hasHeader) {
             const header = tranFile.csv.headings.map(h =>
                 Csv.escapeValue(h.text)).join();
-            const headerList = this.headerFormats.get(header) || [];
-            removeItem(headerList, tranFile);
-            if (!headerList.length) this.headerFormats.delete(header);
+            const headerFormat = this.headerFormats.get(header);
+            if (headerFormat)
+                removeItem(headerFormat.files, tranFile);
+            if (!headerFormat.files.length) this.headerFormats.delete(header);
         }
         tranFile.node.parentNode.removeChild(tranFile.node);
         tranFile.account = null;
@@ -194,7 +207,7 @@ export class Account extends Addable(Named) {
         this.balancePoints.sort((a, b) => a.timestamp - b.timestamp);
         this.displayHeaderFormats();
         this.createBalLine();
-        const balances = this.balLine[Symbol.iterator]().map(p => p.y);
+        const balances = this.balLine.values().map(p => p.y);
         this.balRange = Range.fromValues(balances);
     }
     orderBalancePointContainers() {
@@ -250,7 +263,7 @@ export class Account extends Addable(Named) {
                 });
             }
             bal = balPoint.balance;
-            line[line.length - 1].y = bal;
+            line.at(-1).y = bal;
         }
         sumUntil(Infinity);
         this.startingBal = startingBal;
@@ -270,11 +283,8 @@ export class Account extends Addable(Named) {
             return;
         }
         headersList.innerHTML = '<h4>Header Formats</h4>';
-        for (const [headerFormat, files] of this.headerFormats.entries()) {
-            const span = document.createElement('span');
-            const plural = files.length > 1 ? 's' : '';
-            span.textContent = `${files.length} file${plural}: ` + headerFormat;
-            headersList.appendChild(span);
+        for (const headerFormat of this.headerFormats.values()) {
+            headersList.appendChild(headerFormat.node);
         }
     }
     displayDiscrepancies() {
@@ -340,7 +350,7 @@ export class Account extends Addable(Named) {
             .concat(this.autoBalPoints || []);
         this.balancePoints.sort((a, b) => a.timestamp - b.timestamp);
         
-        this.checkBalancePointContinuity();
+        this.createBalLine();
     }
     encode() {
         return {

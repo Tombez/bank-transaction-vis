@@ -9,6 +9,7 @@ import ActivityGraph from './graphs/ActivityGraph.js';
 import {TransactionFile} from './TransactionFile.js';
 import {Account} from './Account.js';
 import {Bank} from './Bank.js';
+import {BankRoot} from './Named.js';
 import {TabBar} from './TabBar.js';
 import TransactionViewer from './TransactionViewer.js';
 import {Range, best, BitArray, debounceFunc} from './utils.js';
@@ -22,8 +23,8 @@ let addBankBtn;
 let exportBtn;
 let classifiers = [];
 let bankList = window.bankList = [];
-let banksRoot = {children: bankList, hasNode: true, content: {hasNode: true},
-    __proto__: Bank.prototype};
+let banksRoot = new BankRoot('Banks Root', {});
+banksRoot.children = bankList;
 let transactionTab = null;
 let compileCounter = 0;
 let tViewer;
@@ -245,31 +246,27 @@ const compileTransactionsDebounced = () => {
 
     removeGraphs();
 
-    tViewer = recreateTViewer(transactions);
+    tViewer.transactions = transactions;
+    tViewer.update();
     
-    const accounts = bankList.map(bank => bank.accounts).flat();
+    const accounts = bankList.values().flatMap(bank => bank.accounts)
+        .filter(a => a.transactions.length).toArray();
     if (!accounts.length) return;
-    
-    const accountsWithTs = accounts.filter(a => a.transactions.length);
-    if (!accountsWithTs.length) return;
 
-    const stampRange = Range.fromRanges(accountsWithTs.map(a => a.stampRange));
+    const stampRange = Range.fromRanges(accounts.map(a => a.stampRange));
     activityRange = stampRange;
-    const balRange = Range.fromRanges(accountsWithTs.map(a => a.balRange));
+    const balRange = Range.fromRanges(accounts.map(a => a.balRange));
     banksRoot.balRange = balRange;
-    banksRoot.accountsWithTs = accountsWithTs;
+    banksRoot.accountsWithTs = accounts;
     
     const event = new CustomEvent('change');
     document.querySelector('#chartSelect').dispatchEvent(event);
     updateActivityGraphs();
 };
-const recreateTViewer = (transactions) => {
+const createTViewer = () => {
     const tranContainer = document.querySelector('#transactions');
-    const oldViewer = tranContainer.querySelector('.transaction-viewer');
-    if (oldViewer) oldViewer.parentNode.removeChild(oldViewer);
-    let tViewer = new TransactionViewer(transactions);
+    tViewer = new TransactionViewer([]);
     tranContainer.appendChild(tViewer.node);
-    return tViewer;
 };
 const loadTransactions = (transactions) => {
     console.debug('transactions: ', transactions);
@@ -327,7 +324,6 @@ const makeNetWorthGraph = (accounts, stampRange, balRange) => {
     }
 
     const size = {x: canvasSize.x, y: 400};
-    // title, values, labels, size, dataRangeX, dataRangeY
     let netWorthGraph = new ViewLineGraph('Net Worth Over Time', [totalBalance],
         ['Net Worth'], size, stampRange, balRange);
     window.netWorthGraph = netWorthGraph;
@@ -336,7 +332,7 @@ const makeNetWorthGraph = (accounts, stampRange, balRange) => {
 const updateActivityGraphs = () => {
     const banks = bankList;
     const range = activityRange;
-    const dayCount = Math.round(range.diff / MS_DAY) + 1;
+    const dayCount = Math.ceil(range.diff / MS_DAY);
 
     for (const bank of banks) {
         let bankSum = new BitArray(dayCount);
@@ -628,6 +624,7 @@ const afterPageLoad = event => {
 
     const transactionElm = document.querySelector('#transactions');
     transactionTab = tabBar.addTab('Transactions', transactionElm);
+    createTViewer();
 
     textInp = document.querySelector("#transaction-input");
     unlabeledDiv = document.querySelector("#unlabeled");

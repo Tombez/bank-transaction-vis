@@ -40,7 +40,8 @@ export default class HierarchalPieGraph extends Graph {
         //     this.calculatePieces(root.children, root.total, -0.5*Math.PI, 1.5*Math.PI, innerRadius, radius);
         // }
 
-        if (event.which == 1) {
+        const PRIMARY = 0;
+        if (event.button == PRIMARY) {
             // Find closest text to pointer
             const [minText, minDist] = this.texts.reduce(([minText, min], text) => {
                 const tx = text.drawLoc.x;

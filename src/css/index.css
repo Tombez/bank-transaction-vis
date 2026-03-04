@@ -308,6 +308,7 @@ td, th {
 }
 .page-selected {
     border: 1px solid var(--main-color);
+    cursor: default;
 }
 .content {
     padding-left: 1%;

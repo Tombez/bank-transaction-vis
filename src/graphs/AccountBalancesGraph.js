@@ -62,13 +62,10 @@ export default class AccountBalancesGraph extends ViewLineGraph {
     update() {
         if (!this.settings) return;
         const removeSweep = a =>
-            a.transactions//.filter(t => !/\bsweep\b/i.test(t.desc));
-        let values = this.accounts.map(a => {
-            if (a.type == 'Brokerage') {
-                let transactions = removeSweep(a);
-                return createBalLine(transactions, a.balancePoints);
-            } else return a.balLine;
-        });
+            a.transactions.filter(t => !/\bsweep\b/i.test(t.desc));
+        let values = this.accounts.map(a => a.type == 'Brokerage' ?
+            createBalLine(removeSweep(a), a.balancePoints) :
+            a.balLine);
         let labels;
         if (this.settings.get('groupByType')) {
             this.title = 'Balances By Account Type Over Time';

@@ -86,22 +86,24 @@ export class CsvViewer extends LazyHtml {
 
         this.node.querySelector('.page-selected').innerText = number + 1;
         const pageItems = this.node.querySelector('.page-items');
-        const itemStart = this.page * this.itemsPerPage + 1;
+        const length = this.csv.rows.length;
+        const itemStart = this.page * this.itemsPerPage + (length ? 1 : 0);
         let itemEnd = itemStart - 1 + this.itemsPerPage;
         itemEnd = Math.min(itemEnd, this.csv.rows.length);
-        pageItems.innerText = `Items ${itemStart}–${itemEnd} of ${this.csv.rows.length}`;
+        pageItems.innerText = `Items ${itemStart}–${itemEnd} of ${length}`;
         const lastPage = this.node.querySelector('.page-btn.page-last');
         lastPage.innerText = this.pageCount;
 
         for (const node of [...this.node.querySelectorAll('.page-first')])
             node.style.visibility = number == 0 ? 'hidden' : 'visible';
         for (const node of [...this.node.querySelectorAll('.page-last')])
-            node.style.visibility = this.pageCount == 0 || number == this.pageCount - 1 ? 'hidden' : 'visible';
+            node.style.visibility = this.pageCount == 0 ||
+                number == this.pageCount - 1 ? 'hidden' : 'visible';
 
         const startIndex = number * this.itemsPerPage;
         let endIndex = startIndex + this.itemsPerPage;
         endIndex = Math.min(endIndex, this.csv.rows.length);
-        let rowsText = "";
+        let rowsText = '';
         for (let i = startIndex; i < endIndex; ++i) {
             const t = this.csv.rows[i];
             rowsText += `<tr>
@@ -116,5 +118,16 @@ export class CsvViewer extends LazyHtml {
         this.pageCount = Math.ceil(this.csv.rows.length / this.itemsPerPage);
         if (!this.page) this.page = 0;
         if (this.hasNode) this.displayPage(this.page);
+        this.updateHeaderTypes();
+    }
+    updateHeaderTypes() {
+        if (!this.hasNode) return;
+        const typeSpans = this.node.querySelectorAll('.col-type');
+        const sparseSpans = this.node.querySelectorAll('.sparse-descriptor');
+        for (let i = 0; i < this.csv.headings.length; ++i) {
+            const heading = this.csv.headings[i];
+            typeSpans[i].textContent = typeText(heading.type);
+            sparseSpans[i].textContent = heading.isSparse ? 'Sparse' : '';
+        }
     }
 }

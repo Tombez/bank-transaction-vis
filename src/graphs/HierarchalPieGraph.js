@@ -25,7 +25,6 @@ export default class HierarchalPieGraph extends Graph {
         this.radialPointer.y = this.pointer.y - this.canvas.height / 2;
     }
     pointerdown(event) {
-        console.debug('pointerdown');
         super.pointerdown(event);
         event.preventDefault();
         const {x, y} = this.radialPointer;
@@ -56,7 +55,6 @@ export default class HierarchalPieGraph extends Graph {
     pointerup(event) {
         super.pointerup(event);
         this.dragging = null;
-        console.debug('pointerup');
     }
     pointermove(event) {
         super.pointermove(event);
@@ -65,13 +63,7 @@ export default class HierarchalPieGraph extends Graph {
             this.dragging.drawLoc.y = this.radialPointer.y;
         }
     }
-    contextmenu(event) {
-        console.debug('context menu, dragging: ', !!this.dragging);
-        // if (this.dragging) {
-        //     event.preventDefault();
-        //     event.stopPropagation();
-        // }
-    }
+    contextmenu(event) { }
     textCollisions() {
         for (let i = 0; i < this.texts.length; ++i) {
             const a = this.texts[i].drawLoc;

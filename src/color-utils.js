@@ -21,7 +21,6 @@ export class Color {
         return this;
     }
     diff(c) {
-        if (!c) debugger;
         return new Color(this.r - c.r, this.g - c.g, this.b - c.b);
     }
     dist(c) {

@@ -101,7 +101,6 @@ export default class TransactionViewer extends CsvViewer {
                 this.filtersNode.innerHTML += `<div class="filter">${label}</div>`;
         }
         this.sortBy();
-        this.updateHeaderTypes();
     }
 }
 const updateOptions = (transactions, filterTransactions, minDateT, maxDateT) => {

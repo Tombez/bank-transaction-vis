@@ -114,7 +114,7 @@ const loadRules = rules => {
     for (const rule of rules) loadRule(rule);
     console.debug('classifiers', classifiers);
 };
-const loadRule = (rule, parentCategory) => {
+const loadRule = (rule, parentCategory) => { // recursive
     let category = rule.category;
     if (parentCategory)
         category = `${parentCategory}/${category}`;
@@ -374,12 +374,16 @@ const decodeGraph = array => {
 };
 
 const labelTransactions = transactions => {
+    if (!transactions || !transactions.length) return;
     let categories = new Map();
+    console.debug('labelTransactions', classifiers.length);
 
     // Match longer and therefore more specific rules first:
     classifiers.sort((a,b) => b.unique.length - a.unique.length);
     // Match sub-categories first
-    classifiers.sort((a,b) => b.label.length - a.label.length);
+    const categoryCount = classifier => classifier.label.split('/').length;
+    classifiers.sort((a,b) => categoryCount(b) - categoryCount(a));
+    for (const classifier of classifiers) classifier.transactions = [];
 
     for (const transaction of transactions) {
         let {date, desc, amount} = transaction;
@@ -387,10 +391,11 @@ const labelTransactions = transactions => {
 
         let [label, classifier] = labelTransaction(date, desc, amount);
         if (!label) label = 'Uncategorized';
-        if (!classifier.transactions) classifier.transactions = [];
-        classifier.transactions.push(transaction);
-        transaction.classifier = classifier;
-        const labels = label.split("/");
+        else {
+            classifier.transactions.push(transaction);
+            transaction.classifier = classifier;
+        }
+        const labels = label.split('/');
         transaction.labels = labels;
         const category = labels[0];
 
@@ -403,7 +408,6 @@ const labelTransactions = transactions => {
         if (!curCategory.transactions) curCategory.transactions = [];
         curCategory.transactions.push(transaction);
     }
-    // let labeledCsv = transactions.map(row => row.join(",")).join("\n");
 
     const ignored = categories.get("Ignored");
     categories.delete("Ignored");
@@ -441,7 +445,8 @@ const labelTransactions = transactions => {
     let ignoredRoot = consolidate(new Map([["Ignored", ignored]]))[0];
     // console.debug(JSON.stringify(encodeGraph(root)));
     // console.debug("total:", root.total);
-    console.debug("no matching transactions:", classifiers.filter(c => !c.transactions));
+    console.debug("no matching transactions:", classifiers.filter(c => !c.transactions?.length));
+    classifierViewer.update();
     return {root, income: incomeRoot, ignored: ignoredRoot};
 };
 
@@ -606,6 +611,14 @@ const afterPageLoad = event => {
     classifierViewer = new ClassifierViewer(classifiers);
     let classifierTab = tabBar.addTab('Classifiers', classifierViewer.node);
     document.body.appendChild(classifierViewer.node);
+    const relabel = () => {
+        console.debug('relabel called');
+        //labelTransactions(banksRoot.transactions);
+        const event = new CustomEvent('change');
+        document.querySelector('#chartSelect').dispatchEvent(event);
+    };
+    classifierViewer.node.addEventListener('classifier-changed', relabel);
+    classifierViewer.node.addEventListener('classifier-delete', relabel);
 
     textInp = document.querySelector("#transaction-input");
     unlabeledDiv = document.querySelector("#unlabeled");

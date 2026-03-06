@@ -552,9 +552,91 @@ label[for="transaction-input"] {
     height: 7px;
     margin-left: 2.5%;
 }
-
-
-
+.classifier-list {
+    display: flex;
+    flex-direction: column;
+}
+.classifier {
+    background: var(--bank-bg);
+    width: fit-content;
+    margin: 8px 8px;
+    padding: 8px;
+    border-radius: 10px;
+    max-width: 97%;
+}
+.classifier-header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+.classifier-header:has(.classifier-dropdown:focus-visible) {
+    border-left: 2px solid white;
+}
+.classifier-dropdown {
+    mask: var(--arrow-left-svg);
+    background: var(--main-color);
+    border: 0;
+    width: 1.5em;
+    height: 1.5em;
+    transform: rotate(180deg);
+    cursor: pointer;
+    padding: 0;
+    margin-right: 5px;
+    transition: transform 0.3s ease-in-out; 
+}
+.classifier-dropdown.expanded {
+    transform: rotate(-90deg);
+}
+.classifier-content {
+    margin-top: 5px;
+    interpolate-size: allow-keywords;
+    transition: all 0.3s ease-in-out;
+    overflow: clip;
+}
+.classifier-content > *:not(.csv-viewer) {
+    margin-bottom: 5px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+.classifier input, .classifier select,
+.classifer *[content-editable="plaintext-only"], .classifier-delete {
+    box-sizing: content-box;
+    font-size: 0.9em;
+    height: 1.2em;
+    padding: 2px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+/* .classifier icon-edit {
+    transform: translate(0, 10%);
+} */
+.classifier input:disabled, .classifier select:disabled {
+    color: var(--main-color);
+}
+.classifier *[content-editable="plaintext-only"] {
+    color: white;
+}
+.classifier-amount {
+    width: 123px;
+    text-align: center;
+}
+.classifier-amount:invalid {
+    background: darkred;
+}
+.classifier-delete:hover {
+    background: darkred;
+    cursor: pointer;
+}
+.hidden {
+    height: 0;
+    width: 1px;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    outline: 0;
+    border: 0;
+}
 
 @media only screen and (max-width: 600px) {
     header {

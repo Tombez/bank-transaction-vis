@@ -4,7 +4,6 @@ import {Filter} from '../TransactionFile.js';
 
 export class SpendingHPieGraph extends HierarchalPieGraph {
     contextmenu(event) {
-        console.debug('spending hpie contextmenu');
         const sector = this.getMouseSector();
         if (sector) {
             const contextMenu = new ContextMenu();

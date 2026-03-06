@@ -121,8 +121,8 @@ export class ViewLineGraph extends LineGraph {
     }
     pointerdown(event) {
         this.setPointer(event);
-        console.debug('pointerdown button', event.button);
-        if (event.button == 0) {
+        const PRIMARY = 0;
+        if (event.button == PRIMARY) {
             if (this.pointer.y >= this.ctx.height) {
                 const pointer = this.pointer;
                 const r = this.ballRadius;

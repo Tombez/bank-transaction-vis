@@ -43,7 +43,6 @@ export default class FlowGraph extends Graph {
 
             layer.total = layer.reduce((sum, p) => p.total + sum, 0);
             layer.possiblePixelsPer$ = (this.canvas.height - (layer.length + 1) * this.verticalPad) / layer.total;
-            if (layer.possiblePixelsPer$ < 0) debugger;
         }
         this.rootLayer = layers.reduce((least, cur) =>
             cur.possiblePixelsPer$ < least.possiblePixelsPer$ ? cur : least);

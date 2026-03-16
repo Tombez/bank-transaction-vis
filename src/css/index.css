@@ -274,6 +274,8 @@ td, th {
 }
 .icon-edit {
     background-image: url("../../assets/pencil.svg");
+    background-size: 90% 90%;
+    background-position: center;
 }
 .icon-done {
     background-image: url("../../assets/check-mark.svg");
@@ -286,6 +288,8 @@ td, th {
 }
 .icon-add {
     background-image: url("../../assets/plus.svg");
+    background-size: 70% 70%;
+    background-position: center;
 }
 .icon-left {
     background-image: url("../../assets/arrow-left.svg");
@@ -613,6 +617,7 @@ label[for="transaction-input"] {
 } */
 .classifier input:disabled, .classifier select:disabled {
     color: var(--main-color);
+    background: var(--bank-bg);
 }
 .classifier *[content-editable="plaintext-only"] {
     color: white;

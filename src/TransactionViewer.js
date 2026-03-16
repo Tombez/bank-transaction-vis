@@ -2,9 +2,11 @@ import {Csv, CSV_DATA_TYPES} from './Csv.js';
 import {CsvViewer} from './CsvViewer.js';
 import {dateToYmd} from './date-utils.js';
 
+const defaultHeadings = 'Bank,Account,Date,Description,Amount,Category,Count';
+
 export default class TransactionViewer extends CsvViewer {
     constructor(transactions) {
-        const csv = new Csv('Bank,Account,Date,Description,Amount,Category',
+        const csv = new Csv(defaultHeadings,
             /* has header */ true);
         super(csv);
         this.transactions = transactions;
@@ -18,6 +20,16 @@ export default class TransactionViewer extends CsvViewer {
 
         this.filtersNode = document.createElement('div');
         this.node.insertBefore(this.filtersNode, this.node.firstChild);
+
+        this.duplicatesBox = document.createElement('input');
+        this.duplicatesBox.type = 'checkbox';
+        const duplicatesDiv = document.createElement('div');
+        duplicatesDiv.textContent = 'Filter duplicate descriptions?';
+        duplicatesDiv.insertBefore(this.duplicatesBox, duplicatesDiv.firstChild);
+        this.node.insertBefore(duplicatesDiv, this.node.firstChild);
+        this.duplicatesBox.addEventListener('change', () => {
+            this.update();
+        });
 
         // Add column sort buttons
         const ths = this.node.querySelectorAll('th');
@@ -79,6 +91,16 @@ export default class TransactionViewer extends CsvViewer {
         let filtered = this.transactions;
         for (const {test} of this.filters)
             filtered = filtered.filter(test);
+        // Filter duplicates
+        let descCounts = new Map();
+        if (this.duplicatesBox?.checked) {
+            filtered = filtered.filter(t => {
+                const count = descCounts.get(t.desc) || 0;
+                descCounts.set(t.desc, count + 1);
+                return !count;
+            });
+        }
+
         const numberFormat = new Intl.NumberFormat('en-US', {
             style: 'currency', currency: 'USD' });
         const rows = filtered.map(t => {
@@ -87,8 +109,11 @@ export default class TransactionViewer extends CsvViewer {
             const dateStr = dateToYmd(t.date);
             const amount = numberFormat.format(t.amount);
             const category = t.labels?.join('/') || 'Uncategorized';
-            return [bank.name, account.name, dateStr, t.desc, amount,
+            const row = [bank.name, account.name, dateStr, t.desc, amount,
                 category];
+            if (this.duplicatesBox.checked) row.push(descCounts.get(t.desc));
+            else row.push('');
+            return row;
         });
         return rows;
     }
@@ -132,7 +157,6 @@ const updateOptions = (transactions, filterTransactions, minDateT, maxDateT) => 
         <input type="checkbox" id="duplicates" name="duplicates" checked />`;
     let transElm = document.querySelector("#transactions");
     // document.body.insertBefore(settingsDiv, transElm);
-    const duplicatesBox = settingsDiv.querySelector("#duplicates");
     const periodSelect = settingsDiv.querySelector("#period");
     const changePeriod = () => {
         const periodValue = periodSelect.value;
@@ -147,16 +171,6 @@ const updateOptions = (transactions, filterTransactions, minDateT, maxDateT) => 
         makeHPieGraph(root, title);
         makeFlowGraph({root, income}, title);
 
-        // Filter duplicates
-        if (duplicatesBox.checked) {
-            let descs = new Set();
-            filtered = filtered.filter(t => {
-                const isDup = descs.has(t.desc);
-                if (!isDup) descs.add(t.desc);
-                return !isDup;
-            });
-        }
-
         // Stats:
         let uniqueDescs = [...new Set(filtered.map(t => t.desc))].length;
         let unlabeled = filtered.filter(t => !t.labels[0]).length;
@@ -169,7 +183,6 @@ const updateOptions = (transactions, filterTransactions, minDateT, maxDateT) => 
         }
     };
     periodSelect.addEventListener("change", changePeriod);
-    duplicatesBox.addEventListener("change", changePeriod);
 
     changePeriod();
 };

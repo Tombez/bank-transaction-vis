@@ -31,7 +31,7 @@ class Transaction {
         this.row = row;
         this.transactionFile = transactionFile;
 
-        this.timestamp = +this.date;
+        this.timestamp = this.date.getTime();
         this.year = this.date.getFullYear();
         this.month = this.date.getMonth() + 1;
         this.quarter = (this.month - 1) / 3 | 0;
@@ -234,8 +234,7 @@ export class TransactionFile extends Named {
         if (!this.isFullyFilled) return;
         this.getTransactions();
         if (this.transactions.length) {
-            const stamps = this.transactions[Symbol.iterator]().map(t =>
-                t.timestamp);
+            const stamps = this.transactions.values().map(t => t.timestamp);
             this.stampRange = Range.fromValues(stamps);
         }
         this.balancePoints = this.getBalancePoints();

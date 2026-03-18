@@ -246,6 +246,37 @@ const compileTransactionsDebounced = () => {
     let transactions = banksRoot.transactions;
     transactions.sort((a, b) => a.timestamp - b.timestamp);
 
+    const byAmount = new Map();
+    for (const t of transactions) {
+        const amount = Math.abs(t.amount);
+        if (amount === 0) continue;
+        let entry = byAmount.get(amount);
+        if (!entry) byAmount.set(amount, entry = []);
+        entry.push(t);
+    }
+    let transferPairs = [];
+    const daysBetween = (ta, tb) => Math.abs(Math.round(
+        (ta.timestamp - tb.timestamp) / MS_DAY));
+    for (const transA of transactions) {
+        if (transA.amount >= 0) continue;
+        const amount = Math.abs(transA.amount);
+        const account = transA.transactionFile.account;
+        const potentialMatches = (byAmount.get(amount) || [])
+            .filter(t => daysBetween(transA, t) <= 7 &&
+                t.transactionFile.account != account);
+        if (!potentialMatches.length) continue;
+        potentialMatches.sort((a, b) => daysBetween(transA, a) -
+            daysBetween(transA, b));
+        const match = potentialMatches[0];
+        transA.transferMatch = match;
+        match.transferMatch = transA;
+        transferPairs.push([transA, match]);
+    }
+    console.debug('transfer pairs:', transferPairs);
+    const transferRegex = /xfer|transfer|ACH Transaction - |ACH WEB PAYMENT|Withdraw(al)? (all )?to [*•]*\d{4}|Deposit from [*•]*\d{4}|ACH Debit - |Ext Tfr/i;
+    // const confidentPairs = transferPairs.filter(([a, b]) =>
+    //     transferRegex.test(a.desc) && transferRegex.test(b.desc));
+
     removeGraphs();
 
     tViewer.transactions = transactions;
@@ -376,18 +407,27 @@ const decodeGraph = array => {
 const labelTransactions = transactions => {
     if (!transactions || !transactions.length) return;
     let categories = new Map();
-    console.debug('labelTransactions', classifiers.length);
 
     // Match longer and therefore more specific rules first:
     classifiers.sort((a,b) => b.unique.length - a.unique.length);
     // Match sub-categories first
     const categoryCount = classifier => classifier.label.split('/').length;
     classifiers.sort((a,b) => categoryCount(b) - categoryCount(a));
+    const typePrecedence = classifier => {
+        switch(classifier.type) {
+            case 'custom-return': return 5;
+            case 'custom': return 4;
+            case 'exact': return 3;
+            case 'starts': return 2;
+            case 'has':
+            default: return 1;
+        }
+    };
+    classifiers.sort((a,b) => typePrecedence(b) - typePrecedence(a));
     for (const classifier of classifiers) classifier.transactions = [];
 
     for (const transaction of transactions) {
         let {date, desc, amount} = transaction;
-        desc = desc.toLowerCase();
 
         let [label, classifier] = labelTransaction(date, desc, amount);
         if (!label) label = 'Uncategorized';
@@ -612,7 +652,6 @@ const afterPageLoad = event => {
     let classifierTab = tabBar.addTab('Classifiers', classifierViewer.node);
     document.body.appendChild(classifierViewer.node);
     const relabel = () => {
-        console.debug('relabel called');
         //labelTransactions(banksRoot.transactions);
         const event = new CustomEvent('change');
         document.querySelector('#chartSelect').dispatchEvent(event);

@@ -80,7 +80,7 @@ export class Classifier extends LazyHtml {
         this.uniqueNode = get('.classifier-unique');
         this.uniqueNode.textContent = this.unique;
         this.uniqueNode.addEventListener('input', event => {
-            this.unique = event.target.textContent.toLowerCase();
+            this.unique = event.target.textContent;
             this.changed();
         });
         this.categoryNode = get('.classifier-category');
@@ -191,7 +191,6 @@ export class Classifier extends LazyHtml {
         this.hasChanged = false;
     }
     changed() {
-        console.debug('classifier changed', this);
         this.hasChanged = true;
     }
 }
@@ -219,7 +218,6 @@ export class ClassifierViewer extends LazyHtml {
         if (this.listNode) this.listNode.append(classifier.node);
     }
     remove(classifier) {
-        console.debug('remove classifier', classifier);
         if (classifier.hasNode)
             classifier.node.parentNode.removeChild(classifier.node);
         const index = this.classifiers.indexOf(classifier);
